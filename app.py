@@ -17,46 +17,59 @@ st.set_page_config(
 # ─── Global CSS ──────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
+/* ── base ── */
 [data-testid="stAppViewContainer"] {
-    background: linear-gradient(180deg, #0a0e1a 0%, #0f1117 100%);
+    background: linear-gradient(160deg, #0a0e1a 0%, #0d1220 50%, #0f1117 100%);
 }
-[data-testid="stHeader"] { background: transparent; }
-[data-testid="stSidebar"] { background: #0f1117; }
+[data-testid="stHeader"]  { background: transparent; }
+[data-testid="stSidebar"] { background: #0a0e1a; }
 
+/* ── section headings ── */
+h2 { letter-spacing: .02em; }
+
+/* ── zone snapshot card ── */
 .zone-card {
-    border-radius: 16px;
-    padding: 28px 32px;
-    margin: 16px 0;
-    box-shadow: 0 4px 32px rgba(0,0,0,0.4);
+    border-radius: 20px;
+    padding: 24px 28px;
+    margin: 14px 0;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.45);
 }
-.zone-title { font-size: 28px; font-weight: 700; letter-spacing: .05em; margin: 0; }
-.zone-pe    { font-size: 15px; opacity: .8; margin-top: 4px; }
-.zone-action-label { font-size: 12px; opacity: .65; text-transform: uppercase; letter-spacing: .1em; margin: 0; }
-.zone-action-value { font-size: 22px; font-weight: 700; margin: 4px 0 0; }
-.zone-note  { font-size: 13px; opacity: .75; margin-top: 16px; padding-top: 12px;
+.zone-title { font-size: clamp(20px,4vw,28px); font-weight: 800; margin: 0; }
+.zone-pe    { font-size: clamp(13px,2vw,15px); opacity: .8; margin-top: 4px; }
+.zone-action-label { font-size: 11px; opacity: .6; text-transform: uppercase; letter-spacing: .12em; margin: 0; }
+.zone-action-value { font-size: clamp(16px,3vw,22px); font-weight: 700; margin: 4px 0 0; }
+.zone-note  { font-size: 13px; opacity: .72; margin-top: 14px; padding-top: 12px;
               border-top: 1px solid rgba(255,255,255,.15); }
 
-.pe-result-card {
-    border-radius: 16px;
-    padding: 32px;
-    text-align: center;
-    margin: 20px 0;
-    box-shadow: 0 8px 40px rgba(0,0,0,.5);
+/* ── action bar (below gauge) ── */
+.action-bar {
+    border-radius: 14px;
+    padding: 18px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
 }
-.pe-result-label { font-size: 13px; opacity: .65; text-transform: uppercase; letter-spacing: .1em; }
-.pe-result-value { font-size: 72px; font-weight: 800; line-height: 1.1; margin: 8px 0; }
-.pe-result-zone  { font-size: 22px; font-weight: 600; }
-.pe-grid-label   { font-size: 12px; opacity: .65; margin: 0; }
-.pe-grid-value   { font-size: 20px; font-weight: 700; margin: 4px 0 0; }
-.pe-note-box     { background: rgba(0,0,0,.18); border-radius: 8px; padding: 12px 16px;
-                   margin-top: 16px; text-align: left; font-size: 13px; opacity: .85; }
+.action-bar-left  { min-width: 160px; }
+.action-bar-right { display: flex; gap: clamp(16px,4vw,36px); flex-wrap: wrap; }
+.ab-label { margin: 0; font-size: 11px; opacity: .65; }
+.ab-value { margin: 4px 0 0; font-size: clamp(16px,3vw,20px); font-weight: 700; }
+
+/* ── mobile overrides ── */
+@media (max-width: 640px) {
+    .zone-card { padding: 18px 16px; }
+    .action-bar { flex-direction: column; align-items: flex-start; padding: 16px; }
+    .action-bar-right { gap: 18px; }
+    [data-testid="stMetric"] { font-size: 13px; }
+}
 </style>
 """, unsafe_allow_html=True)
 
 # ─── PE Zone Definitions ─────────────────────────────────────────────────────
 ZONES = [
     {
-        "zone_name": "极度危险", "range_label": "PE > 40",
+        "zone_name": "危险！别碰", "range_label": "PE > 40",
         "icon": "🔴", "target": "—", "multiplier": "0×",
         "amount": 0, "reserve_change": 125, "reserve_sign": "+",
         "reserve_note": "本周 $125 全部留存账户",
@@ -64,7 +77,7 @@ ZONES = [
         "table_bg": "#8b0000", "text_color": "#ffffff",
     },
     {
-        "zone_name": "偏高估", "range_label": "35 < PE ≤ 40",
+        "zone_name": "有点贵", "range_label": "35 < PE ≤ 40",
         "icon": "🟠", "target": "VOO", "multiplier": "0.6×",
         "amount": 75, "reserve_change": 50, "reserve_sign": "+",
         "reserve_note": "本周留存 $50 进入账户结余",
@@ -72,7 +85,7 @@ ZONES = [
         "table_bg": "#c2410c", "text_color": "#ffffff",
     },
     {
-        "zone_name": "中性", "range_label": "32 < PE ≤ 35",
+        "zone_name": "正常发挥", "range_label": "32 < PE ≤ 35",
         "icon": "🟡", "target": "VOO", "multiplier": "1×",
         "amount": 125, "reserve_change": 0, "reserve_sign": "",
         "reserve_note": "本周不留存",
@@ -80,7 +93,7 @@ ZONES = [
         "table_bg": "#a16207", "text_color": "#ffffff",
     },
     {
-        "zone_name": "偏便宜", "range_label": "28 < PE ≤ 32",
+        "zone_name": "小捡漏", "range_label": "28 < PE ≤ 32",
         "icon": "🟢", "target": "QQQM", "multiplier": "1.5×",
         "amount": 187, "reserve_change": 62, "reserve_sign": "-",
         "reserve_note": "从账户结余取用 $62",
@@ -88,7 +101,7 @@ ZONES = [
         "table_bg": "#4d7c0f", "text_color": "#ffffff",
     },
     {
-        "zone_name": "便宜", "range_label": "25 < PE ≤ 28",
+        "zone_name": "大甩卖", "range_label": "25 < PE ≤ 28",
         "icon": "💚", "target": "QQQM", "multiplier": "2×",
         "amount": 250, "reserve_change": 125, "reserve_sign": "-",
         "reserve_note": "从账户结余取用 $125",
@@ -96,7 +109,7 @@ ZONES = [
         "table_bg": "#15803d", "text_color": "#ffffff",
     },
     {
-        "zone_name": "极度便宜", "range_label": "PE ≤ 25",
+        "zone_name": "黄金坑", "range_label": "PE ≤ 25",
         "icon": "🩵", "target": "QQQM", "multiplier": "2.5× + 全清结余",
         "amount": 312, "reserve_change": None, "reserve_sign": "",
         "reserve_note": "$312 定投 + 累计结余全部一次性买入 QQQM",
@@ -132,9 +145,9 @@ def fmt_reserve(zone: dict) -> str:
 def fetch_qqq_info() -> dict:
     try:
         info = yf.Ticker("QQQ").info
-        return {"pe": info.get("trailingPE"), "eps": info.get("trailingEps")}
+        return {"pe": info.get("trailingPE")}
     except Exception:
-        return {"pe": None, "eps": None}
+        return {"pe": None}
 
 
 @st.cache_data(ttl=300)
@@ -193,7 +206,6 @@ qqq_info  = fetch_qqq_info()
 qqqm_data = fetch_current_price("QQQM")
 voo_data  = fetch_current_price("VOO")
 auto_pe   = qqq_info["pe"]
-auto_eps  = qqq_info["eps"]
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 模块 1 — 当前市场快照
@@ -212,11 +224,11 @@ with toggle_col:
     else:
         current_pe = auto_pe
 
-m1, m2, m3, m4 = st.columns(4)
+m1, m2, m3 = st.columns(3)
 with m1:
     st.metric("纳斯达克100 TTM PE",
               f"{current_pe:.2f}" if current_pe else "—",
-              help="来自 QQQ trailingPE，可手动覆盖以 Gurufocus 数据为准")
+              help="来自 QQQ trailingPE，可手动覆盖以 Wind / Gurufocus 数据为准")
 with m2:
     if qqqm_data["price"] and qqqm_data["prev_close"]:
         chg = (qqqm_data["price"] - qqqm_data["prev_close"]) / qqqm_data["prev_close"] * 100
@@ -229,9 +241,6 @@ with m3:
         st.metric("VOO 实时价", f"${voo_data['price']:.2f}", f"{chg:+.2f}%")
     else:
         st.metric("VOO 实时价", "—")
-with m4:
-    st.metric("QQQ TTM EPS", f"${auto_eps:.4f}" if auto_eps else "—",
-              help="QQQ trailingEps，用于历史 PE 估算")
 
 # 操作建议大卡片
 if current_pe:
@@ -318,24 +327,18 @@ HIST_OPTS = {"近 30 天": "1mo", "近 90 天": "3mo", "近半年": "6mo", "近 
 hist_label = st.selectbox("数据范围", list(HIST_OPTS.keys()), index=2, key="hist_range")
 hist_df    = fetch_history("QQQM", HIST_OPTS[hist_label])
 
-if auto_eps:
-    eps_val = auto_eps
-    st.caption(f"使用 QQQ 当前 TTM EPS = ${auto_eps:.4f} 估算历史 PE（简化方法）")
-else:
-    eps_val = st.number_input(
-        "yfinance 未获取到 EPS，请手动输入 QQQ TTM EPS：",
-        min_value=0.01, value=5.0, step=0.01, format="%.4f", key="manual_eps",
-    )
-
-if not hist_df.empty and eps_val:
+if not hist_df.empty and current_pe and qqqm_data["price"]:
+    cur_pe    = float(current_pe)
+    cur_price = float(qqqm_data["price"])
+    # 历史PE = (历史收盘价 / 当前收盘价) × 当前爬取PE，直接用爬取值推算，无需EPS
+    hist_pe = (hist_df["Close"] / cur_price * cur_pe).round(2)
     tbl = pd.DataFrame({
-        "日期":      hist_df.index.strftime("%Y-%m-%d"),
-        "开盘":      hist_df["Open"].round(2),
-        "收盘":      hist_df["Close"].round(2),
-        "最高":      hist_df["High"].round(2),
-        "最低":      hist_df["Low"].round(2),
-        "EPS (TTM)": round(float(eps_val), 4),
-        "PE":        (hist_df["Close"] / float(eps_val)).round(2),
+        "日期":   hist_df.index.strftime("%Y-%m-%d"),
+        "开盘":   hist_df["Open"].round(2),
+        "收盘":   hist_df["Close"].round(2),
+        "最高":   hist_df["High"].round(2),
+        "最低":   hist_df["Low"].round(2),
+        "PE":     hist_pe,
     }).reset_index(drop=True)
     tbl["PE 区间"] = tbl["PE"].apply(lambda v: get_pe_zone(float(v))["zone_name"])
 
@@ -348,50 +351,106 @@ if not hist_df.empty and eps_val:
         use_container_width=True, hide_index=True,
     )
     st.caption(
-        "⚠️ 以上 PE 为简化估算（用当前 EPS 反推），实际历史 EPS 每季度更新。"
+        f"PE 基于爬取的实时 NDX PE（{cur_pe:.2f}）按价格比例推算，当日数值与实时一致。"
         "精确历史 PE 请参考 [Gurufocus](https://www.gurufocus.com/term/pe/QQQM/PE-Ratio/QQQM)。"
     )
+elif not current_pe:
+    st.warning("无法获取当前 PE，请开启手动输入后刷新。")
 else:
-    st.warning("无法加载历史数据或 EPS 未设置。")
+    st.warning("无法加载 QQQM 历史数据。")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 模块 4 — PE 独立计算器
+# 模块 4 — PE 仪表盘（直接使用实时 PE）
 # ═══════════════════════════════════════════════════════════════════════════════
-st.markdown("## 🧮 PE 独立计算器")
-st.caption(
-    "注意：这里的「EPS」指公司财报里的**每股盈利 Earnings Per Share**，"
-    "跟你定投后的「投资盈亏」是两回事。"
-)
+st.markdown("## 🎯 PE 仪表盘")
 
-c1, c2, c3 = st.columns([2, 2, 1])
-with c1:
-    calc_price = st.number_input("股价 (USD)", min_value=0.01, value=200.0, step=0.01, format="%.2f", key="cp")
-with c2:
-    calc_eps = st.number_input("每股盈利 EPS (USD)", min_value=0.01, value=5.0, step=0.01, format="%.4f", key="ce")
-with c3:
-    st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
-    st.button("计算 PE", use_container_width=True, key="calc_btn")
+if current_pe:
+    cz    = get_pe_zone(float(current_pe))
+    c_amt = f"${cz['amount']}" if cz["amount"] > 0 else "—"
+    c_res = fmt_reserve(cz)
 
-if calc_price > 0 and calc_eps > 0:
-    calc_pe   = calc_price / calc_eps
-    cz        = get_pe_zone(calc_pe)
-    c_amt     = f"${cz['amount']}" if cz["amount"] > 0 else "—"
-    c_res     = fmt_reserve(cz)
-    tc        = cz["text_color"]
+    gauge_max = 55
+    gauge_fig = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=min(float(current_pe), gauge_max),
+        number={"font": {"size": 40, "color": "#ffffff"}, "valueformat": ".1f", "prefix": "PE "},
+        title={"text": f"{cz['icon']} {cz['zone_name']}", "font": {"size": 22, "color": "#ffffff"}},
+        gauge={
+            "axis": {
+                "range": [0, gauge_max],
+                "tickvals": [25, 28, 32, 35, 40],
+                "tickcolor": "rgba(255,255,255,0.5)",
+                "tickfont": {"color": "rgba(255,255,255,0.6)", "size": 11},
+                "tickwidth": 1,
+            },
+            "bar": {"color": "#ffffff", "thickness": 0.04},
+            "bgcolor": "rgba(0,0,0,0)",
+            "borderwidth": 0,
+            "steps": [
+                {"range": [0,   25],        "color": "#0e7490"},
+                {"range": [25,  28],        "color": "#15803d"},
+                {"range": [28,  32],        "color": "#4d7c0f"},
+                {"range": [32,  35],        "color": "#a16207"},
+                {"range": [35,  40],        "color": "#c2410c"},
+                {"range": [40,  gauge_max], "color": "#8b0000"},
+            ],
+            "threshold": {
+                "line": {"color": "#ffffff", "width": 5},
+                "thickness": 0.85,
+                "value": min(float(current_pe), gauge_max),
+            },
+        },
+    ))
+    gauge_fig.update_layout(
+        paper_bgcolor="rgba(15,17,23,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        height=260,
+        margin=dict(l=40, r=40, t=20, b=0),
+        font={"color": "#ffffff"},
+    )
+    st.plotly_chart(gauge_fig, use_container_width=True, config={"displayModeBar": False})
+
+    # 区间图例
+    zone_legend = [
+        ("≤25",  "黄金坑",   "#0e7490"),
+        ("25-28","大甩卖",   "#15803d"),
+        ("28-32","小捡漏",   "#4d7c0f"),
+        ("32-35","正常发挥", "#a16207"),
+        ("35-40","有点贵",   "#c2410c"),
+        (">40",  "危险！别碰","#8b0000"),
+    ]
+    chips = ""
+    for rng, name, bg in zone_legend:
+        is_cur = (name == cz["zone_name"])
+        border = "2px solid #ffffff" if is_cur else "2px solid transparent"
+        scale  = "font-size:13px;font-weight:700;padding:5px 14px;" if is_cur else "font-size:11px;padding:4px 10px;opacity:0.65;"
+        chips += (f'<span style="background:{bg};color:white;border-radius:20px;'
+                  f'{scale}border:{border};display:inline-block;margin:3px;">'
+                  f'{rng}&nbsp;{name}</span>')
+    st.markdown(
+        f'<div style="text-align:center;margin-top:-8px;margin-bottom:14px;">{chips}</div>',
+        unsafe_allow_html=True,
+    )
+
+    # 操作建议横条
+    tc = cz["text_color"]
     st.markdown(f"""
-    <div class="pe-result-card" style="background:{cz['gradient']};color:{tc};">
-      <p class="pe-result-label">计算结果</p>
-      <p class="pe-result-value">PE = {calc_pe:.2f}</p>
-      <p class="pe-result-zone">{cz['icon']} {cz['zone_name']} · {cz['range_label']}</p>
-      <div style="display:flex;justify-content:center;gap:40px;margin-top:24px;flex-wrap:wrap;">
-        <div><p class="pe-grid-label">买入标的</p><p class="pe-grid-value">{cz['target']}</p></div>
-        <div><p class="pe-grid-label">买入倍数</p><p class="pe-grid-value">{cz['multiplier']}</p></div>
-        <div><p class="pe-grid-label">建议金额</p><p class="pe-grid-value">{c_amt}</p></div>
-        <div><p class="pe-grid-label">结余变化</p><p class="pe-grid-value">{c_res}</p></div>
+    <div class="action-bar" style="background:{cz['gradient']};color:{tc};">
+      <div class="action-bar-left">
+        <p style="margin:0;font-size:11px;opacity:.65;text-transform:uppercase;letter-spacing:.1em;">当前区间</p>
+        <p style="margin:4px 0 0;font-size:clamp(16px,3vw,22px);font-weight:800;">{cz['icon']} {cz['zone_name']} · {cz['range_label']}</p>
       </div>
-      <div class="pe-note-box">{cz['reserve_note']}</div>
+      <div class="action-bar-right">
+        <div><p class="ab-label">买入标的</p><p class="ab-value">{cz['target']}</p></div>
+        <div><p class="ab-label">买入倍数</p><p class="ab-value">{cz['multiplier']}</p></div>
+        <div><p class="ab-label">建议金额</p><p class="ab-value">{c_amt}</p></div>
+        <div><p class="ab-label">结余变化</p><p class="ab-value">{c_res}</p></div>
+      </div>
     </div>
+    <p style="color:rgba(200,200,200,.5);font-size:12px;margin:7px 0 0 4px;">{cz['reserve_note']}</p>
     """, unsafe_allow_html=True)
+else:
+    st.warning("无法获取 PE，请开启顶部手动输入。")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 模块 5 — 策略速查表
