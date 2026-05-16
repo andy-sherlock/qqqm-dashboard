@@ -208,9 +208,9 @@ voo_data  = fetch_current_price("VOO")
 auto_pe   = qqq_info["pe"]
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 模块 1 — 当前市场快照
+# 模块 1 — 市场快照 + PE 仪表盘（合并）
 # ═══════════════════════════════════════════════════════════════════════════════
-st.markdown("## 📊 当前市场快照")
+st.markdown("## 📊 市场快照")
 
 toggle_col, _ = st.columns([2, 6])
 with toggle_col:
@@ -224,25 +224,110 @@ with toggle_col:
     else:
         current_pe = auto_pe
 
-m1, m2, m3 = st.columns(3)
-with m1:
+left_col, right_col = st.columns([1, 1.8])
+
+with left_col:
     st.metric("纳斯达克100 TTM PE",
               f"{current_pe:.2f}" if current_pe else "—",
               help="来自 QQQ trailingPE，可手动覆盖以 Wind / Gurufocus 数据为准")
-with m2:
     if qqqm_data["price"] and qqqm_data["prev_close"]:
         chg = (qqqm_data["price"] - qqqm_data["prev_close"]) / qqqm_data["prev_close"] * 100
         st.metric("QQQM 实时价", f"${qqqm_data['price']:.2f}", f"{chg:+.2f}%")
     else:
         st.metric("QQQM 实时价", "—")
-with m3:
     if voo_data["price"] and voo_data["prev_close"]:
         chg = (voo_data["price"] - voo_data["prev_close"]) / voo_data["prev_close"] * 100
         st.metric("VOO 实时价", f"${voo_data['price']:.2f}", f"{chg:+.2f}%")
     else:
         st.metric("VOO 实时价", "—")
 
-if not current_pe:
+if current_pe:
+    cz    = get_pe_zone(float(current_pe))
+    c_amt = f"${cz['amount']}" if cz["amount"] > 0 else "—"
+    c_res = fmt_reserve(cz)
+
+    with right_col:
+        gauge_max = 55
+        gauge_fig = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=min(float(current_pe), gauge_max),
+            number={"font": {"size": 40, "color": "#ffffff"}, "valueformat": ".1f", "prefix": "PE "},
+            title={"text": f"{cz['icon']} {cz['zone_name']}", "font": {"size": 22, "color": "#ffffff"}},
+            gauge={
+                "axis": {
+                    "range": [0, gauge_max],
+                    "tickvals": [25, 28, 32, 35, 40],
+                    "tickcolor": "rgba(255,255,255,0.5)",
+                    "tickfont": {"color": "rgba(255,255,255,0.6)", "size": 11},
+                    "tickwidth": 1,
+                },
+                "bar": {"color": "#ffffff", "thickness": 0.04},
+                "bgcolor": "rgba(0,0,0,0)",
+                "borderwidth": 0,
+                "steps": [
+                    {"range": [0,   25],        "color": "#0e7490"},
+                    {"range": [25,  28],        "color": "#15803d"},
+                    {"range": [28,  32],        "color": "#4d7c0f"},
+                    {"range": [32,  35],        "color": "#a16207"},
+                    {"range": [35,  40],        "color": "#c2410c"},
+                    {"range": [40,  gauge_max], "color": "#8b0000"},
+                ],
+                "threshold": {
+                    "line": {"color": "#ffffff", "width": 5},
+                    "thickness": 0.85,
+                    "value": min(float(current_pe), gauge_max),
+                },
+            },
+        ))
+        gauge_fig.update_layout(
+            paper_bgcolor="rgba(15,17,23,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            height=260,
+            margin=dict(l=40, r=40, t=20, b=0),
+            font={"color": "#ffffff"},
+        )
+        st.plotly_chart(gauge_fig, use_container_width=True, config={"displayModeBar": False})
+
+    # 区间图例（全宽）
+    zone_legend = [
+        ("≤25",  "黄金坑",   "#0e7490"),
+        ("25-28","大甩卖",   "#15803d"),
+        ("28-32","小捡漏",   "#4d7c0f"),
+        ("32-35","正常发挥", "#a16207"),
+        ("35-40","有点贵",   "#c2410c"),
+        (">40",  "危险！别碰","#8b0000"),
+    ]
+    chips = ""
+    for rng, name, bg in zone_legend:
+        is_cur = (name == cz["zone_name"])
+        border = "2px solid #ffffff" if is_cur else "2px solid transparent"
+        scale  = "font-size:13px;font-weight:700;padding:5px 14px;" if is_cur else "font-size:11px;padding:4px 10px;opacity:0.65;"
+        chips += (f'<span style="background:{bg};color:white;border-radius:20px;'
+                  f'{scale}border:{border};display:inline-block;margin:3px;">'
+                  f'{rng}&nbsp;{name}</span>')
+    st.markdown(
+        f'<div style="text-align:center;margin-top:-8px;margin-bottom:14px;">{chips}</div>',
+        unsafe_allow_html=True,
+    )
+
+    # 操作建议横条
+    tc = cz["text_color"]
+    st.markdown(f"""
+    <div class="action-bar" style="background:{cz['gradient']};color:{tc};">
+      <div class="action-bar-left">
+        <p style="margin:0;font-size:11px;opacity:.65;text-transform:uppercase;letter-spacing:.1em;">当前区间</p>
+        <p style="margin:4px 0 0;font-size:clamp(16px,3vw,22px);font-weight:800;">{cz['icon']} {cz['zone_name']} · {cz['range_label']}</p>
+      </div>
+      <div class="action-bar-right">
+        <div><p class="ab-label">买入标的</p><p class="ab-value">{cz['target']}</p></div>
+        <div><p class="ab-label">买入倍数</p><p class="ab-value">{cz['multiplier']}</p></div>
+        <div><p class="ab-label">建议金额</p><p class="ab-value">{c_amt}</p></div>
+        <div><p class="ab-label">结余变化</p><p class="ab-value">{c_res}</p></div>
+      </div>
+    </div>
+    <p style="color:rgba(200,200,200,.5);font-size:12px;margin:7px 0 0 4px;">{cz['reserve_note']}</p>
+    """, unsafe_allow_html=True)
+else:
     st.warning("无法自动获取 PE，请开启手动输入。")
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -338,98 +423,6 @@ elif not current_pe:
 else:
     st.warning("无法加载 QQQM 历史数据。")
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# 模块 4 — PE 仪表盘（直接使用实时 PE）
-# ═══════════════════════════════════════════════════════════════════════════════
-st.markdown("## 🎯 PE 仪表盘")
-
-if current_pe:
-    cz    = get_pe_zone(float(current_pe))
-    c_amt = f"${cz['amount']}" if cz["amount"] > 0 else "—"
-    c_res = fmt_reserve(cz)
-
-    gauge_max = 55
-    gauge_fig = go.Figure(go.Indicator(
-        mode="gauge+number",
-        value=min(float(current_pe), gauge_max),
-        number={"font": {"size": 40, "color": "#ffffff"}, "valueformat": ".1f", "prefix": "PE "},
-        title={"text": f"{cz['icon']} {cz['zone_name']}", "font": {"size": 22, "color": "#ffffff"}},
-        gauge={
-            "axis": {
-                "range": [0, gauge_max],
-                "tickvals": [25, 28, 32, 35, 40],
-                "tickcolor": "rgba(255,255,255,0.5)",
-                "tickfont": {"color": "rgba(255,255,255,0.6)", "size": 11},
-                "tickwidth": 1,
-            },
-            "bar": {"color": "#ffffff", "thickness": 0.04},
-            "bgcolor": "rgba(0,0,0,0)",
-            "borderwidth": 0,
-            "steps": [
-                {"range": [0,   25],        "color": "#0e7490"},
-                {"range": [25,  28],        "color": "#15803d"},
-                {"range": [28,  32],        "color": "#4d7c0f"},
-                {"range": [32,  35],        "color": "#a16207"},
-                {"range": [35,  40],        "color": "#c2410c"},
-                {"range": [40,  gauge_max], "color": "#8b0000"},
-            ],
-            "threshold": {
-                "line": {"color": "#ffffff", "width": 5},
-                "thickness": 0.85,
-                "value": min(float(current_pe), gauge_max),
-            },
-        },
-    ))
-    gauge_fig.update_layout(
-        paper_bgcolor="rgba(15,17,23,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        height=260,
-        margin=dict(l=40, r=40, t=20, b=0),
-        font={"color": "#ffffff"},
-    )
-    st.plotly_chart(gauge_fig, use_container_width=True, config={"displayModeBar": False})
-
-    # 区间图例
-    zone_legend = [
-        ("≤25",  "黄金坑",   "#0e7490"),
-        ("25-28","大甩卖",   "#15803d"),
-        ("28-32","小捡漏",   "#4d7c0f"),
-        ("32-35","正常发挥", "#a16207"),
-        ("35-40","有点贵",   "#c2410c"),
-        (">40",  "危险！别碰","#8b0000"),
-    ]
-    chips = ""
-    for rng, name, bg in zone_legend:
-        is_cur = (name == cz["zone_name"])
-        border = "2px solid #ffffff" if is_cur else "2px solid transparent"
-        scale  = "font-size:13px;font-weight:700;padding:5px 14px;" if is_cur else "font-size:11px;padding:4px 10px;opacity:0.65;"
-        chips += (f'<span style="background:{bg};color:white;border-radius:20px;'
-                  f'{scale}border:{border};display:inline-block;margin:3px;">'
-                  f'{rng}&nbsp;{name}</span>')
-    st.markdown(
-        f'<div style="text-align:center;margin-top:-8px;margin-bottom:14px;">{chips}</div>',
-        unsafe_allow_html=True,
-    )
-
-    # 操作建议横条
-    tc = cz["text_color"]
-    st.markdown(f"""
-    <div class="action-bar" style="background:{cz['gradient']};color:{tc};">
-      <div class="action-bar-left">
-        <p style="margin:0;font-size:11px;opacity:.65;text-transform:uppercase;letter-spacing:.1em;">当前区间</p>
-        <p style="margin:4px 0 0;font-size:clamp(16px,3vw,22px);font-weight:800;">{cz['icon']} {cz['zone_name']} · {cz['range_label']}</p>
-      </div>
-      <div class="action-bar-right">
-        <div><p class="ab-label">买入标的</p><p class="ab-value">{cz['target']}</p></div>
-        <div><p class="ab-label">买入倍数</p><p class="ab-value">{cz['multiplier']}</p></div>
-        <div><p class="ab-label">建议金额</p><p class="ab-value">{c_amt}</p></div>
-        <div><p class="ab-label">结余变化</p><p class="ab-value">{c_res}</p></div>
-      </div>
-    </div>
-    <p style="color:rgba(200,200,200,.5);font-size:12px;margin:7px 0 0 4px;">{cz['reserve_note']}</p>
-    """, unsafe_allow_html=True)
-else:
-    st.warning("无法获取 PE，请开启顶部手动输入。")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 模块 5 — 策略速查表
