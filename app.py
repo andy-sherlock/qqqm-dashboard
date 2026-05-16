@@ -242,30 +242,7 @@ with m3:
     else:
         st.metric("VOO 实时价", "—")
 
-# 操作建议大卡片
-if current_pe:
-    zone = get_pe_zone(float(current_pe))
-    amt  = f"${zone['amount']}" if zone["amount"] > 0 else "—"
-    res  = fmt_reserve(zone)
-    tc   = zone["text_color"]
-    st.markdown(f"""
-    <div class="zone-card" style="background:{zone['gradient']};color:{tc};">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:20px;">
-        <div>
-          <p class="zone-title">{zone['icon']} {zone['zone_name']}</p>
-          <p class="zone-pe">{zone['range_label']} · 当前 PE {float(current_pe):.2f}</p>
-        </div>
-        <div style="display:flex;gap:36px;flex-wrap:wrap;">
-          <div><p class="zone-action-label">买入标的</p><p class="zone-action-value">{zone['target']}</p></div>
-          <div><p class="zone-action-label">买入倍数</p><p class="zone-action-value">{zone['multiplier']}</p></div>
-          <div><p class="zone-action-label">建议金额</p><p class="zone-action-value">{amt}</p></div>
-          <div><p class="zone-action-label">结余变化</p><p class="zone-action-value">{res}</p></div>
-        </div>
-      </div>
-      <p class="zone-note">{zone['reserve_note']}</p>
-    </div>
-    """, unsafe_allow_html=True)
-else:
+if not current_pe:
     st.warning("无法自动获取 PE，请开启手动输入。")
 
 # ═══════════════════════════════════════════════════════════════════════════════
