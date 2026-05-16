@@ -1,0 +1,7 @@
+services:
+  fire-tracker:
+    build: .
+    container_name: fire-tracker
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
