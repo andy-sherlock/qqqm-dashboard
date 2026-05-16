@@ -347,7 +347,9 @@ if not hist_df.empty and current_pe and qqqm_data["price"]:
         return f"background-color:{bg};color:white;font-weight:600;" if bg else ""
 
     st.dataframe(
-        tbl.style.map(_style_zone, subset=["PE 区间"]),
+        tbl.style
+            .format({"开盘": "{:.2f}", "收盘": "{:.2f}", "最高": "{:.2f}", "最低": "{:.2f}", "PE": "{:.2f}"})
+            .map(_style_zone, subset=["PE 区间"]),
         use_container_width=True, hide_index=True,
     )
     st.caption(
