@@ -17,51 +17,72 @@ st.set_page_config(
 # ─── Global CSS ──────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-/* ── base ── */
-[data-testid="stAppViewContainer"] {
-    background: linear-gradient(160deg, #0a0e1a 0%, #0d1220 50%, #0f1117 100%);
+/* ── spacing ── */
+.block-container { padding-top: 1rem !important; padding-bottom: 2rem !important; }
+@media (max-width: 640px) { .block-container { padding-top: 0.25rem !important; } }
+
+/* ── frosted header ── */
+[data-testid="stHeader"] {
+    background: rgba(245,245,247,0.85) !important;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(0,0,0,0.06);
 }
-[data-testid="stHeader"]  { background: transparent; }
-[data-testid="stSidebar"] { background: #0a0e1a; }
 
 /* ── section headings ── */
-h2 { letter-spacing: .02em; }
+h2 { font-weight: 700 !important; letter-spacing: -0.02em; margin-bottom: 12px !important; }
 
-/* ── zone snapshot card ── */
-.zone-card {
-    border-radius: 20px;
-    padding: 24px 28px;
-    margin: 14px 0;
-    box-shadow: 0 8px 40px rgba(0,0,0,0.45);
+/* ── metric cards: elevate above the F5F5F7 background ── */
+[data-testid="metric-container"] {
+    background: #FFFFFF;
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 16px;
+    padding: 16px 20px !important;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
-.zone-title { font-size: clamp(20px,4vw,28px); font-weight: 800; margin: 0; }
-.zone-pe    { font-size: clamp(13px,2vw,15px); opacity: .8; margin-top: 4px; }
-.zone-action-label { font-size: 11px; opacity: .6; text-transform: uppercase; letter-spacing: .12em; margin: 0; }
-.zone-action-value { font-size: clamp(16px,3vw,22px); font-weight: 700; margin: 4px 0 0; }
-.zone-note  { font-size: 13px; opacity: .72; margin-top: 14px; padding-top: 12px;
-              border-top: 1px solid rgba(255,255,255,.15); }
+[data-testid="metric-container"]:hover {
+    box-shadow: 0 6px 28px rgba(0,0,0,0.1);
+    transform: translateY(-2px);
+}
 
-/* ── action bar (below gauge) ── */
+/* ── dataframes ── */
+[data-testid="stDataFrame"] {
+    border-radius: 16px;
+    border: 1px solid rgba(0,0,0,0.06) !important;
+    overflow: hidden;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+}
+
+/* ── divider ── */
+hr { border-color: rgba(0,0,0,0.08) !important; }
+
+/* ── zone card ── */
+.zone-card {
+    border-radius: 20px; padding: 24px 28px; margin: 14px 0;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+    border: 1px solid rgba(255,255,255,0.25);
+}
+
+/* ── action bar ── */
 .action-bar {
-    border-radius: 14px;
-    padding: 18px 24px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 14px;
+    border-radius: 20px; padding: 22px 30px;
+    display: flex; justify-content: space-between;
+    align-items: center; flex-wrap: wrap; gap: 14px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25);
+    border: 1px solid rgba(255,255,255,0.2);
 }
 .action-bar-left  { min-width: 160px; }
-.action-bar-right { display: flex; gap: clamp(16px,4vw,36px); flex-wrap: wrap; }
-.ab-label { margin: 0; font-size: 11px; opacity: .65; }
-.ab-value { margin: 4px 0 0; font-size: clamp(16px,3vw,20px); font-weight: 700; }
+.action-bar-right { display: flex; gap: clamp(16px,4vw,40px); flex-wrap: wrap; align-items: center; }
+.ab-label { margin: 0; font-size: 11px; opacity: .75; text-transform: uppercase; letter-spacing: .1em; font-weight: 600; }
+.ab-value { margin: 4px 0 0; font-size: clamp(16px,3vw,22px); font-weight: 700; letter-spacing: -.01em; }
+.ab-divider { width: 1px; min-height: 36px; background: rgba(255,255,255,0.25); align-self: stretch; }
 
-/* ── mobile overrides ── */
+/* ── mobile ── */
 @media (max-width: 640px) {
     .zone-card { padding: 18px 16px; }
-    .action-bar { flex-direction: column; align-items: flex-start; padding: 16px; }
-    .action-bar-right { gap: 18px; }
-    [data-testid="stMetric"] { font-size: 13px; }
+    .action-bar { flex-direction: column; align-items: flex-start; padding: 18px; }
+    .action-bar-right { gap: 20px; }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -192,14 +213,14 @@ if "records" not in st.session_state:
 
 # ─── Header ───────────────────────────────────────────────────────────────────
 st.markdown("""
-<h1 style="color:#00d4ff;font-size:2rem;font-weight:800;margin-bottom:2px;">
+<h1 style="color:#1D1D1F;font-size:clamp(1.4rem,5vw,2.2rem);font-weight:800;margin-bottom:4px;white-space:nowrap;letter-spacing:-0.02em;">
   📈 Andy's FIRE Tracker
 </h1>
-<p style="color:rgba(224,224,224,.55);font-size:.9rem;margin-top:0;">
+<p style="color:#6E6E73;font-size:.9rem;margin-top:0;margin-bottom:0;font-weight:400;">
   QQQM / VOO 纳指动态定投 Dashboard · 基于纳斯达克100 TTM PE
 </p>
+<hr style="border:none;border-top:1px solid rgba(0,0,0,.08);margin:12px 0 10px;">
 """, unsafe_allow_html=True)
-st.divider()
 
 # ─── Fetch data once ──────────────────────────────────────────────────────────
 qqq_info  = fetch_qqq_info()
@@ -224,7 +245,7 @@ with toggle_col:
     else:
         current_pe = auto_pe
 
-left_col, right_col = st.columns([1, 1.8])
+left_col, right_col = st.columns([1, 2.2])
 
 with left_col:
     st.metric("纳斯达克100 TTM PE",
@@ -251,17 +272,17 @@ if current_pe:
         gauge_fig = go.Figure(go.Indicator(
             mode="gauge+number",
             value=min(float(current_pe), gauge_max),
-            number={"font": {"size": 40, "color": "#ffffff"}, "valueformat": ".1f", "prefix": "PE "},
-            title={"text": f"{cz['icon']} {cz['zone_name']}", "font": {"size": 22, "color": "#ffffff"}},
+            number={"font": {"size": 40, "color": "#1D1D1F"}, "valueformat": ".1f", "prefix": "PE "},
+            title={"text": f"{cz['icon']} {cz['zone_name']}", "font": {"size": 20, "color": "#1D1D1F"}},
             gauge={
                 "axis": {
                     "range": [0, gauge_max],
                     "tickvals": [25, 28, 32, 35, 40],
-                    "tickcolor": "rgba(255,255,255,0.5)",
-                    "tickfont": {"color": "rgba(255,255,255,0.6)", "size": 11},
+                    "tickcolor": "rgba(0,0,0,0.3)",
+                    "tickfont": {"color": "rgba(0,0,0,0.55)", "size": 11},
                     "tickwidth": 1,
                 },
-                "bar": {"color": "#ffffff", "thickness": 0.04},
+                "bar": {"color": "#1D1D1F", "thickness": 0.04},
                 "bgcolor": "rgba(0,0,0,0)",
                 "borderwidth": 0,
                 "steps": [
@@ -273,59 +294,62 @@ if current_pe:
                     {"range": [40,  gauge_max], "color": "#8b0000"},
                 ],
                 "threshold": {
-                    "line": {"color": "#ffffff", "width": 5},
+                    "line": {"color": "#1D1D1F", "width": 4},
                     "thickness": 0.85,
                     "value": min(float(current_pe), gauge_max),
                 },
             },
         ))
         gauge_fig.update_layout(
-            paper_bgcolor="rgba(15,17,23,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            height=260,
-            margin=dict(l=40, r=40, t=20, b=0),
-            font={"color": "#ffffff"},
+            height=290,
+            margin=dict(l=40, r=40, t=50, b=0),
+            font={"color": "#1D1D1F"},
         )
         st.plotly_chart(gauge_fig, use_container_width=True, config={"displayModeBar": False})
 
-    # 区间图例（全宽）
-    zone_legend = [
-        ("≤25",  "黄金坑",   "#0e7490"),
-        ("25-28","大甩卖",   "#15803d"),
-        ("28-32","小捡漏",   "#4d7c0f"),
-        ("32-35","正常发挥", "#a16207"),
-        ("35-40","有点贵",   "#c2410c"),
-        (">40",  "危险！别碰","#8b0000"),
-    ]
-    chips = ""
-    for rng, name, bg in zone_legend:
-        is_cur = (name == cz["zone_name"])
-        border = "2px solid #ffffff" if is_cur else "2px solid transparent"
-        scale  = "font-size:13px;font-weight:700;padding:5px 14px;" if is_cur else "font-size:11px;padding:4px 10px;opacity:0.65;"
-        chips += (f'<span style="background:{bg};color:white;border-radius:20px;'
-                  f'{scale}border:{border};display:inline-block;margin:3px;">'
-                  f'{rng}&nbsp;{name}</span>')
-    st.markdown(
-        f'<div style="text-align:center;margin-top:-8px;margin-bottom:14px;">{chips}</div>',
-        unsafe_allow_html=True,
-    )
+        # 区间图例（gauge 内部，居中对齐）
+        zone_legend = [
+            ("≤25",  "黄金坑",   "#0e7490"),
+            ("25-28","大甩卖",   "#15803d"),
+            ("28-32","小捡漏",   "#4d7c0f"),
+            ("32-35","正常发挥", "#a16207"),
+            ("35-40","有点贵",   "#c2410c"),
+            (">40",  "危险！别碰","#8b0000"),
+        ]
+        chips = ""
+        for rng, name, bg in zone_legend:
+            is_cur = (name == cz["zone_name"])
+            border = "2px solid #1D1D1F" if is_cur else "2px solid transparent"
+            scale  = "font-size:13px;font-weight:700;padding:5px 14px;" if is_cur else "font-size:11px;padding:4px 10px;opacity:0.7;"
+            chips += (f'<span style="background:{bg};color:white;border-radius:20px;'
+                      f'{scale}border:{border};display:inline-block;margin:3px;">'
+                      f'{rng}&nbsp;{name}</span>')
+        st.markdown(
+            f'<div style="text-align:center;margin-top:-6px;margin-bottom:10px;">{chips}</div>',
+            unsafe_allow_html=True,
+        )
 
     # 操作建议横条
     tc = cz["text_color"]
     st.markdown(f"""
     <div class="action-bar" style="background:{cz['gradient']};color:{tc};">
       <div class="action-bar-left">
-        <p style="margin:0;font-size:11px;opacity:.65;text-transform:uppercase;letter-spacing:.1em;">当前区间</p>
-        <p style="margin:4px 0 0;font-size:clamp(16px,3vw,22px);font-weight:800;">{cz['icon']} {cz['zone_name']} · {cz['range_label']}</p>
+        <p style="margin:0;font-size:11px;opacity:.6;text-transform:uppercase;letter-spacing:.12em;font-weight:500;">当前区间</p>
+        <p style="margin:6px 0 0;font-size:clamp(17px,3vw,24px);font-weight:800;letter-spacing:-.01em;">{cz['icon']} {cz['zone_name']} · {cz['range_label']}</p>
       </div>
       <div class="action-bar-right">
         <div><p class="ab-label">买入标的</p><p class="ab-value">{cz['target']}</p></div>
+        <div class="ab-divider"></div>
         <div><p class="ab-label">买入倍数</p><p class="ab-value">{cz['multiplier']}</p></div>
+        <div class="ab-divider"></div>
         <div><p class="ab-label">建议金额</p><p class="ab-value">{c_amt}</p></div>
+        <div class="ab-divider"></div>
         <div><p class="ab-label">结余变化</p><p class="ab-value">{c_res}</p></div>
       </div>
     </div>
-    <p style="color:rgba(200,200,200,.5);font-size:12px;margin:7px 0 0 4px;">{cz['reserve_note']}</p>
+    <p style="color:#6E6E73;font-size:12px;margin:8px 0 0 6px;letter-spacing:.01em;">{cz['reserve_note']}</p>
     """, unsafe_allow_html=True)
 else:
     st.warning("无法自动获取 PE，请开启手动输入。")
@@ -366,16 +390,16 @@ if not kline_df.empty:
         marker_color=vol_colors, name="成交量", showlegend=False), row=2, col=1)
 
     fig.update_layout(
-        paper_bgcolor="rgba(15,17,23,1)", plot_bgcolor="rgba(15,17,23,1)",
-        font=dict(color="#e0e0e0"), height=560,
+        paper_bgcolor="#FFFFFF", plot_bgcolor="#FFFFFF",
+        font=dict(color="#1D1D1F"), height=560,
         margin=dict(l=0, r=0, t=20, b=0),
         xaxis_rangeslider_visible=False,
-        legend=dict(bgcolor="rgba(255,255,255,.05)",
-                    bordercolor="rgba(255,255,255,.1)", borderwidth=1),
+        legend=dict(bgcolor="rgba(255,255,255,0.9)",
+                    bordercolor="rgba(0,0,0,0.08)", borderwidth=1),
     )
-    fig.update_xaxes(gridcolor="rgba(255,255,255,.05)",
+    fig.update_xaxes(gridcolor="rgba(0,0,0,0.05)",
                      rangebreaks=[dict(bounds=["sat", "mon"])])
-    fig.update_yaxes(gridcolor="rgba(255,255,255,.05)")
+    fig.update_yaxes(gridcolor="rgba(0,0,0,0.05)")
     st.plotly_chart(fig, use_container_width=True)
 else:
     st.warning("无法加载 QQQM 历史数据。")
