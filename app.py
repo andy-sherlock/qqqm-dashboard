@@ -1,3 +1,4 @@
+import math
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -103,13 +104,13 @@ h3 {
     font-size: 13px !important;
 }
 
-/* ── plotly chart cards ── */
+/* ── plotly chart cards — borderless, shadow only ── */
 [data-testid="stPlotlyChart"] > div {
     background: #FFFDFB;
-    border: 1px solid #E7E2D9;
+    border: none;
     border-radius: 20px;
     overflow: hidden;
-    box-shadow: 0 2px 12px rgba(28,25,23,0.05);
+    box-shadow: 0 4px 32px rgba(28,25,23,0.07), 0 0 0 1px rgba(231,226,217,0.45);
     padding: 4px;
 }
 
@@ -198,6 +199,17 @@ hr { border-color: #E7E2D9 !important; }
     .action-bar { flex-direction: column; align-items: flex-start; padding: 20px; }
     .action-bar-right { gap: 20px; }
 }
+
+/* ── top gold signature bar ── */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #92400E 0%, #D97706 35%, #B45309 65%, #92400E 100%);
+    z-index: 99999;
+    pointer-events: none;
+}
 </style>
 """)
 
@@ -208,8 +220,8 @@ ZONES = [
         "icon": "🔴", "target": "—", "multiplier": "0×",
         "amount": 0, "reserve_change": 125, "reserve_sign": "+",
         "reserve_note": "本周 $125 全部留存账户",
-        "gradient": "linear-gradient(135deg, #7f1d1d 0%, #b91c1c 100%)",
-        "shadow": "rgba(185,28,28,0.28)",
+        "gradient": "linear-gradient(135deg, #7f1d1d 0%, #dc2626 100%)",
+        "shadow": "rgba(220,38,38,0.28)",
         "table_bg": "#7f1d1d", "text_color": "#ffffff",
     },
     {
@@ -217,66 +229,66 @@ ZONES = [
         "icon": "🟠", "target": "VOO", "multiplier": "0.6×",
         "amount": 75, "reserve_change": 50, "reserve_sign": "+",
         "reserve_note": "本周留存 $50 进入账户结余",
-        "gradient": "linear-gradient(135deg, #92400e 0%, #c2410c 100%)",
-        "shadow": "rgba(194,65,12,0.28)",
-        "table_bg": "#92400e", "text_color": "#ffffff",
+        "gradient": "linear-gradient(135deg, #7c2d12 0%, #ea580c 100%)",
+        "shadow": "rgba(234,88,12,0.28)",
+        "table_bg": "#7c2d12", "text_color": "#ffffff",
     },
     {
         "zone_name": "正常发挥", "range_label": "32 < PE ≤ 35",
         "icon": "🟡", "target": "VOO", "multiplier": "1×",
         "amount": 125, "reserve_change": 0, "reserve_sign": "",
         "reserve_note": "本周不留存",
-        "gradient": "linear-gradient(135deg, #78350f 0%, #b45309 100%)",
-        "shadow": "rgba(180,83,9,0.28)",
-        "table_bg": "#78350f", "text_color": "#ffffff",
+        "gradient": "linear-gradient(135deg, #713f12 0%, #ca8a04 100%)",
+        "shadow": "rgba(202,138,4,0.28)",
+        "table_bg": "#713f12", "text_color": "#ffffff",
     },
     {
         "zone_name": "小捡漏", "range_label": "28 < PE ≤ 32",
         "icon": "🟢", "target": "QQQM", "multiplier": "1.5×",
         "amount": 187, "reserve_change": 62, "reserve_sign": "-",
         "reserve_note": "从账户结余取用 $62",
-        "gradient": "linear-gradient(135deg, #365314 0%, #4d7c0f 100%)",
-        "shadow": "rgba(77,124,15,0.25)",
-        "table_bg": "#365314", "text_color": "#ffffff",
-    },
-    {
-        "zone_name": "大甩卖", "range_label": "25 < PE ≤ 28",
-        "icon": "💚", "target": "QQQM", "multiplier": "2×",
-        "amount": 250, "reserve_change": 125, "reserve_sign": "-",
-        "reserve_note": "从账户结余取用 $125",
-        "gradient": "linear-gradient(135deg, #14532d 0%, #15803d 100%)",
-        "shadow": "rgba(21,128,61,0.25)",
+        "gradient": "linear-gradient(135deg, #14532d 0%, #16a34a 100%)",
+        "shadow": "rgba(22,163,74,0.25)",
         "table_bg": "#14532d", "text_color": "#ffffff",
     },
     {
+        "zone_name": "大甩卖", "range_label": "25 < PE ≤ 28",
+        "icon": "🩵", "target": "QQQM", "multiplier": "2×",
+        "amount": 250, "reserve_change": 125, "reserve_sign": "-",
+        "reserve_note": "从账户结余取用 $125",
+        "gradient": "linear-gradient(135deg, #155e75 0%, #0891b2 100%)",
+        "shadow": "rgba(8,145,178,0.25)",
+        "table_bg": "#155e75", "text_color": "#ffffff",
+    },
+    {
         "zone_name": "黄金坑", "range_label": "PE ≤ 25",
-        "icon": "🩵", "target": "QQQM", "multiplier": "2.5× + 全清结余",
+        "icon": "💙", "target": "QQQM", "multiplier": "2.5× + 全清结余",
         "amount": 312, "reserve_change": None, "reserve_sign": "",
         "reserve_note": "$312 定投 + 累计结余全部一次性买入 QQQM",
-        "gradient": "linear-gradient(135deg, #0c4a6e 0%, #0369a1 100%)",
-        "shadow": "rgba(3,105,161,0.28)",
-        "table_bg": "#0c4a6e", "text_color": "#ffffff",
+        "gradient": "linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)",
+        "shadow": "rgba(37,99,235,0.28)",
+        "table_bg": "#1e3a8a", "text_color": "#ffffff",
     },
 ]
 
 ZONE_BG_MAP = {z["zone_name"]: z["table_bg"] for z in ZONES}
 
-# Gauge step colors (same order as ZONES, from lowest PE to highest)
+# Gauge step colors — 6 clearly distinct colors: blue→cyan→green→yellow→orange→red
 GAUGE_STEPS = [
-    {"range": [0,   25],  "color": "#0369a1"},  # 黄金坑
-    {"range": [25,  28],  "color": "#15803d"},  # 大甩卖
-    {"range": [28,  32],  "color": "#4d7c0f"},  # 小捡漏
-    {"range": [32,  35],  "color": "#b45309"},  # 正常发挥
-    {"range": [35,  40],  "color": "#c2410c"},  # 有点贵
-    {"range": [40,  55],  "color": "#991b1b"},  # 危险
+    {"range": [0,   25],  "color": "#2563eb"},  # 黄金坑  blue-600
+    {"range": [25,  28],  "color": "#0891b2"},  # 大甩卖  cyan-600
+    {"range": [28,  32],  "color": "#16a34a"},  # 小捡漏  green-600
+    {"range": [32,  35],  "color": "#ca8a04"},  # 正常发挥 yellow-600
+    {"range": [35,  40],  "color": "#ea580c"},  # 有点贵  orange-600
+    {"range": [40,  55],  "color": "#dc2626"},  # 危险    red-600
 ]
 ZONE_LEGEND = [
-    ("≤25",  "黄金坑",   "#0369a1"),
-    ("25-28","大甩卖",   "#15803d"),
-    ("28-32","小捡漏",   "#4d7c0f"),
-    ("32-35","正常发挥", "#b45309"),
-    ("35-40","有点贵",   "#c2410c"),
-    (">40",  "危险！别碰","#991b1b"),
+    ("≤25",   "黄金坑",    "#2563eb"),
+    ("25-28",  "大甩卖",   "#0891b2"),
+    ("28-32",  "小捡漏",   "#16a34a"),
+    ("32-35",  "正常发挥", "#ca8a04"),
+    ("35-40",  "有点贵",   "#ea580c"),
+    (">40",    "危险！别碰","#dc2626"),
 ]
 
 
@@ -309,6 +321,92 @@ def section_title(icon: str, text: str):
                    color:#1C1917;font-weight:700;letter-spacing:-0.025em;">{icon}&ensp;{text}</span>
     </div>
     """, unsafe_allow_html=True)
+
+
+def build_gauge_svg(pe_val: float, gauge_max: float = 55) -> str:
+    """SVG semicircle gauge with proper needle from center pointing to current PE."""
+    cx, cy = 200, 162
+    r_out, r_in = 138, 86
+
+    zone_defs = [
+        (0,         25, "#2563eb"),
+        (25,        28, "#0891b2"),
+        (28,        32, "#16a34a"),
+        (32,        35, "#ca8a04"),
+        (35,        40, "#ea580c"),
+        (40, gauge_max, "#dc2626"),
+    ]
+
+    def val_to_rad(v: float) -> float:
+        return math.pi * (1.0 - v / gauge_max)
+
+    def pt(r: float, theta: float):
+        return cx + r * math.cos(theta), cy - r * math.sin(theta)
+
+    # Colored arc segments
+    arcs = ""
+    for v1, v2, color in zone_defs:
+        a1, a2 = val_to_rad(v1), val_to_rad(v2)
+        ox1, oy1 = pt(r_out, a1)
+        ox2, oy2 = pt(r_out, a2)
+        ix1, iy1 = pt(r_in, a1)
+        ix2, iy2 = pt(r_in, a2)
+        laf = 1 if abs(math.degrees(a1 - a2)) > 180 else 0
+        arcs += (
+            f'<path d="M {ox1:.1f},{oy1:.1f} '
+            f'A {r_out},{r_out} 0 {laf} 0 {ox2:.1f},{oy2:.1f} '
+            f'L {ix2:.1f},{iy2:.1f} '
+            f'A {r_in},{r_in} 0 {laf} 1 {ix1:.1f},{iy1:.1f} Z" '
+            f'fill="{color}"/>'
+        )
+
+    # White separator lines at zone boundaries
+    seps = ""
+    for v in [25, 28, 32, 35, 40]:
+        a = val_to_rad(v)
+        x1, y1 = pt(r_in, a)
+        x2, y2 = pt(r_out, a)
+        seps += (
+            f'<line x1="{x1:.1f}" y1="{y1:.1f}" '
+            f'x2="{x2:.1f}" y2="{y2:.1f}" stroke="white" stroke-width="2"/>'
+        )
+
+    # Tick labels
+    lbls = ""
+    for v in [25, 28, 32, 35, 40]:
+        a = val_to_rad(v)
+        lx, ly = pt(r_out + 17, a)
+        lbls += (
+            f'<text x="{lx:.1f}" y="{ly:.1f}" text-anchor="middle" '
+            f'dominant-baseline="middle" fill="#A8A29E" '
+            f'font-size="9.5" font-family="IBM Plex Mono,monospace">{v}</text>'
+        )
+
+    # Needle — triangle from center hub to arc
+    pe_c = min(float(pe_val), gauge_max)
+    na = val_to_rad(pe_c)
+    ntx, nty = pt(r_out * 0.84, na)
+    perp = na + math.pi / 2
+    hw = 5.0
+    b1x = cx + hw * math.cos(perp); b1y = cy - hw * math.sin(perp)
+    b2x = cx - hw * math.cos(perp); b2y = cy + hw * math.sin(perp)
+    pts = f"{ntx:.1f},{nty:.1f} {b1x:.1f},{b1y:.1f} {b2x:.1f},{b2y:.1f}"
+    needle = (
+        f'<polygon points="{pts}" fill="rgba(28,25,23,0.15)" transform="translate(0,3)"/>'
+        f'<polygon points="{pts}" fill="white" stroke="rgba(28,25,23,0.12)" stroke-width="1.2"/>'
+    )
+
+    # Center hub
+    hub = (
+        f'<circle cx="{cx}" cy="{cy}" r="12" fill="white" stroke="#E7E2D9" stroke-width="1.5"/>'
+        f'<circle cx="{cx}" cy="{cy}" r="5" fill="#B45309"/>'
+    )
+
+    return (
+        f'<svg viewBox="0 0 400 195" xmlns="http://www.w3.org/2000/svg" '
+        f'style="width:100%;overflow:visible">'
+        f'{arcs}{seps}{lbls}{needle}{hub}</svg>'
+    )
 
 
 # ─── Data Fetching (cached) ───────────────────────────────────────────────────
@@ -435,57 +533,30 @@ if current_pe:
         gauge_max = 55
         pe_val    = min(float(current_pe), gauge_max)
 
-        gauge_fig = go.Figure(go.Indicator(
-            mode="gauge+number",
-            value=pe_val,
-            number={
-                "font": {
-                    "size": 48,
-                    "color": PRIMARY,
-                    "family": "IBM Plex Mono, monospace",
-                },
-                "valueformat": ".1f",
-                "prefix": "PE ",
-            },
-            title={
-                "text": f"{cz['icon']} {cz['zone_name']}",
-                "font": {
-                    "size": 18,
-                    "color": MUTED,
-                    "family": "IBM Plex Sans, sans-serif",
-                },
-            },
-            gauge={
-                "axis": {
-                    "range": [0, gauge_max],
-                    "tickvals": [25, 28, 32, 35, 40],
-                    "tickcolor": CAPTION,
-                    "tickfont": {"color": MUTED, "size": 11, "family": "IBM Plex Mono, monospace"},
-                    "tickwidth": 1,
-                },
-                # Transparent bar so all zone colors remain visible;
-                # white threshold line acts as the needle pointer
-                "bar": {"color": "rgba(0,0,0,0)", "thickness": 0.01},
-                "bgcolor": "rgba(0,0,0,0)",
-                "borderwidth": 0,
-                "steps": GAUGE_STEPS,
-                "threshold": {
-                    "line": {"color": "rgba(255,255,255,0.95)", "width": 5},
-                    "thickness": 0.82,
-                    "value": pe_val,
-                },
-            },
-        ))
-        gauge_fig.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            height=295,
-            margin=dict(l=40, r=40, t=50, b=0),
-            font={"color": PRIMARY, "family": "IBM Plex Sans, sans-serif"},
+        # ── Zone name badge ──
+        zone_badge = (
+            f'<div style="text-align:center;padding:6px 0 2px;">'
+            f'<span style="font-family:\'IBM Plex Sans\',sans-serif;font-size:17px;'
+            f'font-weight:700;letter-spacing:-0.01em;color:{cz["table_bg"]};">'
+            f'{cz["icon"]}&ensp;{cz["zone_name"]}</span></div>'
         )
-        st.plotly_chart(gauge_fig, use_container_width=True, config={"displayModeBar": False})
 
-        # ── Zone legend chips ──
+        # ── SVG gauge with proper needle from center ──
+        gauge_svg = build_gauge_svg(pe_val, gauge_max)
+
+        # ── PE value — integrated below the arc ──
+        pe_display = (
+            f'<div style="text-align:center;margin-top:-10px;margin-bottom:4px;">'
+            f'<span style="font-family:\'IBM Plex Mono\',monospace;font-size:12px;'
+            f'color:{CAPTION};letter-spacing:0.07em;text-transform:uppercase;">PE</span>'
+            f'<span style="font-family:\'IBM Plex Mono\',monospace;font-size:38px;'
+            f'font-weight:600;color:{PRIMARY};letter-spacing:-0.03em;margin-left:6px;">'
+            f'{pe_val:.1f}</span></div>'
+        )
+
+        st.markdown(zone_badge + gauge_svg + pe_display, unsafe_allow_html=True)
+
+        # ── Zone legend chips — inactive chips keep their zone color at low opacity ──
         chips = ""
         for rng, name, bg in ZONE_LEGEND:
             is_cur = (name == cz["zone_name"])
@@ -493,21 +564,22 @@ if current_pe:
                 chips += (
                     f'<span style="background:{bg};color:#fff;border-radius:20px;'
                     f'font-size:12.5px;font-weight:700;padding:6px 16px;'
-                    f'border:2px solid rgba(255,255,255,0.5);display:inline-block;margin:3px;'
+                    f'border:2px solid rgba(255,255,255,0.45);display:inline-block;margin:3px;'
                     f'box-shadow:0 4px 14px {cz["shadow"]};'
                     f'font-family:IBM Plex Sans,sans-serif;letter-spacing:0.01em;">'
                     f'{rng}&nbsp;{name}</span>'
                 )
             else:
+                # bg28 = ~16% opacity fill; bg55 = ~33% opacity border
                 chips += (
-                    f'<span style="background:rgba(28,25,23,0.04);color:{MUTED};'
-                    f'border-radius:20px;font-size:11px;font-weight:500;padding:4px 12px;'
-                    f'border:1px solid {BORDER};display:inline-block;margin:3px;'
+                    f'<span style="background:{bg}28;color:{bg};'
+                    f'border-radius:20px;font-size:11px;font-weight:600;padding:5px 13px;'
+                    f'border:1.5px solid {bg}66;display:inline-block;margin:3px;'
                     f'font-family:IBM Plex Sans,sans-serif;">'
                     f'{rng}&nbsp;{name}</span>'
                 )
         st.markdown(
-            f'<div style="text-align:center;margin-top:-8px;margin-bottom:10px;">{chips}</div>',
+            f'<div style="text-align:center;margin-bottom:10px;">{chips}</div>',
             unsafe_allow_html=True,
         )
 
