@@ -5,7 +5,6 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import date, timedelta
-import io
 
 st.set_page_config(
     page_title="Andy's FIRE Tracker",
@@ -14,78 +13,193 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# ─── Global CSS ──────────────────────────────────────────────────────────────
-st.markdown("""
+# ─── Design Tokens ────────────────────────────────────────────────────────────
+# Private Banking · Light Luxury palette
+BG          = "#FAF8F5"   # warm cream
+SURFACE     = "#FFFFFF"   # card white
+SURFACE_2   = "#F5F1EB"   # warm stone-100
+PRIMARY     = "#1C1917"   # stone-900
+SECONDARY   = "#44403C"   # stone-700
+MUTED       = "#78716C"   # stone-500
+CAPTION     = "#A8A29E"   # stone-400
+BORDER      = "#E7E2D9"   # warm stone-200
+BORDER_SUB  = "#F0EDE8"   # subtle border
+GOLD        = "#B45309"   # amber-700 (accent)
+GOLD_LIGHT  = "#FEF3C7"   # amber-50
+CHART_BG    = "#FFFDFB"   # warm white for charts
+GRID        = "rgba(231,226,217,0.7)"
+
+# ─── Global CSS (Light Luxury) ────────────────────────────────────────────────
+# st.html() correctly injects <style> tags into the page scope (Streamlit 1.31+)
+st.html("""
 <style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap');
+
+/* ── font ── */
+html, body, [class*="css"], .stApp {
+    font-family: 'IBM Plex Sans', -apple-system, 'Helvetica Neue', sans-serif !important;
+}
+
+/* ── app background ── */
+.stApp {
+    background: linear-gradient(160deg, #FAF8F5 0%, #F5F1EB 100%) !important;
+}
+
 /* ── spacing ── */
-.block-container { padding-top: 1rem !important; padding-bottom: 2rem !important; }
-@media (max-width: 640px) { .block-container { padding-top: 0.25rem !important; } }
+.block-container {
+    padding-top: 1.25rem !important;
+    padding-bottom: 2.5rem !important;
+    max-width: 1280px;
+}
+@media (max-width: 640px) {
+    .block-container { padding-top: 0.5rem !important; }
+}
 
 /* ── frosted header ── */
 [data-testid="stHeader"] {
-    background: rgba(245,245,247,0.85) !important;
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-bottom: 1px solid rgba(0,0,0,0.06);
+    background: rgba(250,248,245,0.9) !important;
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-bottom: 1px solid #E7E2D9;
 }
 
 /* ── section headings ── */
-h2 { font-weight: 700 !important; letter-spacing: -0.02em; margin-bottom: 12px !important; }
+h2 {
+    color: #1C1917 !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.025em !important;
+    margin-bottom: 14px !important;
+    font-family: 'IBM Plex Sans', sans-serif !important;
+}
+h3 {
+    color: #44403C !important;
+    font-weight: 600 !important;
+}
 
-/* ── metric cards: elevate above the F5F5F7 background ── */
+/* ── metric cards ── */
 [data-testid="metric-container"] {
-    background: #FFFFFF;
-    border: 1px solid rgba(0,0,0,0.06);
-    border-radius: 16px;
-    padding: 16px 20px !important;
-    box-shadow: 0 2px 16px rgba(0,0,0,0.06);
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    background: #FFFFFF !important;
+    border: 1px solid #E7E2D9 !important;
+    border-radius: 18px;
+    padding: 18px 22px !important;
+    box-shadow: 0 1px 4px rgba(28,25,23,0.05), 0 4px 16px rgba(28,25,23,0.04);
+    transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
 }
 [data-testid="metric-container"]:hover {
-    box-shadow: 0 6px 28px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 20px rgba(180,83,9,0.12), 0 1px 4px rgba(28,25,23,0.06);
     transform: translateY(-2px);
+    border-color: #B45309 !important;
+}
+
+/* ── metric values — monospace for numbers ── */
+[data-testid="stMetricValue"] > div {
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-weight: 600 !important;
+    color: #1C1917 !important;
+    letter-spacing: -0.01em !important;
+}
+[data-testid="stMetricDelta"] {
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-size: 13px !important;
+}
+
+/* ── plotly chart cards ── */
+[data-testid="stPlotlyChart"] > div {
+    background: #FFFDFB;
+    border: 1px solid #E7E2D9;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(28,25,23,0.05);
+    padding: 4px;
 }
 
 /* ── dataframes ── */
 [data-testid="stDataFrame"] {
     border-radius: 16px;
-    border: 1px solid rgba(0,0,0,0.06) !important;
+    border: 1px solid #E7E2D9 !important;
     overflow: hidden;
-    box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+    box-shadow: 0 2px 12px rgba(28,25,23,0.05);
 }
 
 /* ── divider ── */
-hr { border-color: rgba(0,0,0,0.08) !important; }
+hr { border-color: #E7E2D9 !important; }
 
-/* ── zone card ── */
-.zone-card {
-    border-radius: 20px; padding: 24px 28px; margin: 14px 0;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
-    border: 1px solid rgba(255,255,255,0.25);
+/* ── selectbox / toggle labels ── */
+[data-testid="stSelectbox"] label,
+[data-testid="stToggle"] label,
+[data-testid="stNumberInput"] label {
+    color: #78716C !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.01em !important;
+}
+
+/* ── caption ── */
+[data-testid="stCaptionContainer"] p {
+    color: #A8A29E !important;
+    font-size: 12px !important;
+}
+
+/* ── expander ── */
+[data-testid="stExpander"] {
+    border: 1px solid #E7E2D9 !important;
+    border-radius: 16px !important;
+    background: #FFFFFF !important;
+    box-shadow: 0 1px 4px rgba(28,25,23,0.04) !important;
+}
+[data-testid="stExpander"] summary {
+    color: #44403C !important;
+    font-weight: 600 !important;
 }
 
 /* ── action bar ── */
 .action-bar {
-    border-radius: 20px; padding: 22px 30px;
-    display: flex; justify-content: space-between;
-    align-items: center; flex-wrap: wrap; gap: 14px;
-    box-shadow: 0 8px 40px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25);
-    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 22px;
+    padding: 24px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+    border: 1px solid rgba(255,255,255,0.3);
 }
-.action-bar-left  { min-width: 160px; }
-.action-bar-right { display: flex; gap: clamp(16px,4vw,40px); flex-wrap: wrap; align-items: center; }
-.ab-label { margin: 0; font-size: 11px; opacity: .75; text-transform: uppercase; letter-spacing: .1em; font-weight: 600; }
-.ab-value { margin: 4px 0 0; font-size: clamp(16px,3vw,22px); font-weight: 700; letter-spacing: -.01em; }
-.ab-divider { width: 1px; min-height: 36px; background: rgba(255,255,255,0.25); align-self: stretch; }
+.action-bar-left  { min-width: 180px; }
+.action-bar-right {
+    display: flex;
+    gap: clamp(16px, 4vw, 44px);
+    flex-wrap: wrap;
+    align-items: center;
+}
+.ab-label {
+    margin: 0;
+    font-size: 10px;
+    opacity: .65;
+    text-transform: uppercase;
+    letter-spacing: .14em;
+    font-weight: 600;
+    font-family: 'IBM Plex Sans', sans-serif;
+}
+.ab-value {
+    margin: 4px 0 0;
+    font-size: clamp(16px, 3vw, 22px);
+    font-weight: 700;
+    letter-spacing: -.01em;
+    font-family: 'IBM Plex Mono', monospace;
+}
+.ab-divider {
+    width: 1px;
+    min-height: 36px;
+    background: rgba(255,255,255,0.25);
+    align-self: stretch;
+}
 
 /* ── mobile ── */
 @media (max-width: 640px) {
-    .zone-card { padding: 18px 16px; }
-    .action-bar { flex-direction: column; align-items: flex-start; padding: 18px; }
+    .action-bar { flex-direction: column; align-items: flex-start; padding: 20px; }
     .action-bar-right { gap: 20px; }
 }
 </style>
-""", unsafe_allow_html=True)
+""")
 
 # ─── PE Zone Definitions ─────────────────────────────────────────────────────
 ZONES = [
@@ -94,60 +208,84 @@ ZONES = [
         "icon": "🔴", "target": "—", "multiplier": "0×",
         "amount": 0, "reserve_change": 125, "reserve_sign": "+",
         "reserve_note": "本周 $125 全部留存账户",
-        "gradient": "linear-gradient(135deg, #8b0000 0%, #d32f2f 100%)",
-        "table_bg": "#8b0000", "text_color": "#ffffff",
+        "gradient": "linear-gradient(135deg, #7f1d1d 0%, #b91c1c 100%)",
+        "shadow": "rgba(185,28,28,0.28)",
+        "table_bg": "#7f1d1d", "text_color": "#ffffff",
     },
     {
         "zone_name": "有点贵", "range_label": "35 < PE ≤ 40",
         "icon": "🟠", "target": "VOO", "multiplier": "0.6×",
         "amount": 75, "reserve_change": 50, "reserve_sign": "+",
         "reserve_note": "本周留存 $50 进入账户结余",
-        "gradient": "linear-gradient(135deg, #c2410c 0%, #ea580c 100%)",
-        "table_bg": "#c2410c", "text_color": "#ffffff",
+        "gradient": "linear-gradient(135deg, #92400e 0%, #c2410c 100%)",
+        "shadow": "rgba(194,65,12,0.28)",
+        "table_bg": "#92400e", "text_color": "#ffffff",
     },
     {
         "zone_name": "正常发挥", "range_label": "32 < PE ≤ 35",
         "icon": "🟡", "target": "VOO", "multiplier": "1×",
         "amount": 125, "reserve_change": 0, "reserve_sign": "",
         "reserve_note": "本周不留存",
-        "gradient": "linear-gradient(135deg, #a16207 0%, #eab308 100%)",
-        "table_bg": "#a16207", "text_color": "#ffffff",
+        "gradient": "linear-gradient(135deg, #78350f 0%, #b45309 100%)",
+        "shadow": "rgba(180,83,9,0.28)",
+        "table_bg": "#78350f", "text_color": "#ffffff",
     },
     {
         "zone_name": "小捡漏", "range_label": "28 < PE ≤ 32",
         "icon": "🟢", "target": "QQQM", "multiplier": "1.5×",
         "amount": 187, "reserve_change": 62, "reserve_sign": "-",
         "reserve_note": "从账户结余取用 $62",
-        "gradient": "linear-gradient(135deg, #4d7c0f 0%, #84cc16 100%)",
-        "table_bg": "#4d7c0f", "text_color": "#ffffff",
+        "gradient": "linear-gradient(135deg, #365314 0%, #4d7c0f 100%)",
+        "shadow": "rgba(77,124,15,0.25)",
+        "table_bg": "#365314", "text_color": "#ffffff",
     },
     {
         "zone_name": "大甩卖", "range_label": "25 < PE ≤ 28",
         "icon": "💚", "target": "QQQM", "multiplier": "2×",
         "amount": 250, "reserve_change": 125, "reserve_sign": "-",
         "reserve_note": "从账户结余取用 $125",
-        "gradient": "linear-gradient(135deg, #15803d 0%, #22c55e 100%)",
-        "table_bg": "#15803d", "text_color": "#ffffff",
+        "gradient": "linear-gradient(135deg, #14532d 0%, #15803d 100%)",
+        "shadow": "rgba(21,128,61,0.25)",
+        "table_bg": "#14532d", "text_color": "#ffffff",
     },
     {
         "zone_name": "黄金坑", "range_label": "PE ≤ 25",
         "icon": "🩵", "target": "QQQM", "multiplier": "2.5× + 全清结余",
         "amount": 312, "reserve_change": None, "reserve_sign": "",
         "reserve_note": "$312 定投 + 累计结余全部一次性买入 QQQM",
-        "gradient": "linear-gradient(135deg, #0e7490 0%, #06b6d4 100%)",
-        "table_bg": "#0e7490", "text_color": "#ffffff",
+        "gradient": "linear-gradient(135deg, #0c4a6e 0%, #0369a1 100%)",
+        "shadow": "rgba(3,105,161,0.28)",
+        "table_bg": "#0c4a6e", "text_color": "#ffffff",
     },
 ]
 
 ZONE_BG_MAP = {z["zone_name"]: z["table_bg"] for z in ZONES}
 
+# Gauge step colors (same order as ZONES, from lowest PE to highest)
+GAUGE_STEPS = [
+    {"range": [0,   25],  "color": "#0369a1"},  # 黄金坑
+    {"range": [25,  28],  "color": "#15803d"},  # 大甩卖
+    {"range": [28,  32],  "color": "#4d7c0f"},  # 小捡漏
+    {"range": [32,  35],  "color": "#b45309"},  # 正常发挥
+    {"range": [35,  40],  "color": "#c2410c"},  # 有点贵
+    {"range": [40,  55],  "color": "#991b1b"},  # 危险
+]
+ZONE_LEGEND = [
+    ("≤25",  "黄金坑",   "#0369a1"),
+    ("25-28","大甩卖",   "#15803d"),
+    ("28-32","小捡漏",   "#4d7c0f"),
+    ("32-35","正常发挥", "#b45309"),
+    ("35-40","有点贵",   "#c2410c"),
+    (">40",  "危险！别碰","#991b1b"),
+]
+
 
 def get_pe_zone(pe: float) -> dict:
-    if pe > 40:   return ZONES[0]
-    if pe > 35:   return ZONES[1]
-    if pe > 32:   return ZONES[2]
-    if pe > 28:   return ZONES[3]
-    if pe > 25:   return ZONES[4]
+    if pe > 40:  return ZONES[0]
+    if pe > 35:  return ZONES[1]
+    if pe > 32:  return ZONES[2]
+    if pe > 28:  return ZONES[3]
+    if pe > 25:  return ZONES[4]
     return ZONES[5]
 
 
@@ -159,6 +297,18 @@ def fmt_reserve(zone: dict) -> str:
     if zone["reserve_sign"] == "-":
         return f"-${zone['reserve_change']}"
     return "$0"
+
+
+def section_title(icon: str, text: str):
+    """Premium section header with gold accent bar."""
+    st.markdown(f"""
+    <div style="display:flex;align-items:center;gap:12px;margin:32px 0 18px;">
+      <div style="width:3px;height:26px;background:linear-gradient(180deg,#B45309,#D97706);
+                  border-radius:2px;flex-shrink:0;"></div>
+      <span style="font-family:'IBM Plex Sans',sans-serif;font-size:clamp(1.05rem,2.5vw,1.35rem);
+                   color:#1C1917;font-weight:700;letter-spacing:-0.025em;">{icon}&ensp;{text}</span>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 # ─── Data Fetching (cached) ───────────────────────────────────────────────────
@@ -186,8 +336,7 @@ def fetch_history(ticker: str, period: str) -> pd.DataFrame:
         df = yf.download(ticker, period=period, auto_adjust=True, progress=False)
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.droplevel(1)
-        df = df.dropna(subset=["Close"])
-        return df
+        return df.dropna(subset=["Close"])
     except Exception:
         return pd.DataFrame()
 
@@ -196,7 +345,7 @@ def fetch_history(ticker: str, period: str) -> pd.DataFrame:
 def fetch_price_on_date(ticker: str, target_date: date) -> float | None:
     try:
         start = target_date - timedelta(days=7)
-        end = target_date + timedelta(days=2)
+        end   = target_date + timedelta(days=2)
         df = yf.download(ticker, start=start, end=end, auto_adjust=True, progress=False)
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.droplevel(1)
@@ -212,14 +361,27 @@ if "records" not in st.session_state:
     st.session_state.records = []
 
 # ─── Header ───────────────────────────────────────────────────────────────────
-st.markdown("""
-<h1 style="color:#1D1D1F;font-size:clamp(1.4rem,5vw,2.2rem);font-weight:800;margin-bottom:4px;white-space:nowrap;letter-spacing:-0.02em;">
-  📈 Andy's FIRE Tracker
-</h1>
-<p style="color:#6E6E73;font-size:.9rem;margin-top:0;margin-bottom:0;font-weight:400;">
-  QQQM / VOO 纳指动态定投 Dashboard · 基于纳斯达克100 TTM PE
-</p>
-<hr style="border:none;border-top:1px solid rgba(0,0,0,.08);margin:12px 0 10px;">
+st.markdown(f"""
+<div style="padding:4px 0 16px;">
+  <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
+    <h1 style="font-family:'IBM Plex Sans',sans-serif;
+               color:{PRIMARY};font-size:clamp(1.5rem,4vw,2.1rem);
+               font-weight:700;margin:0;letter-spacing:-0.03em;white-space:nowrap;">
+      📈&ensp;Andy's FIRE Tracker
+    </h1>
+    <span style="font-family:'IBM Plex Sans',sans-serif;
+                 color:{MUTED};font-size:0.85rem;font-weight:400;white-space:nowrap;">
+      QQQM / VOO 纳指动态定投 · 基于纳斯达克100 TTM PE
+    </span>
+  </div>
+  <div style="margin-top:12px;display:flex;align-items:center;gap:8px;">
+    <div style="height:1px;background:linear-gradient(90deg,{GOLD},rgba(180,83,9,0.08));flex:1;max-width:280px;"></div>
+    <span style="font-size:10px;color:{CAPTION};letter-spacing:0.12em;text-transform:uppercase;
+                 font-family:'IBM Plex Sans',sans-serif;font-weight:500;">
+      Private · Long-term · Disciplined
+    </span>
+  </div>
+</div>
 """, unsafe_allow_html=True)
 
 # ─── Fetch data once ──────────────────────────────────────────────────────────
@@ -229,11 +391,11 @@ voo_data  = fetch_current_price("VOO")
 auto_pe   = qqq_info["pe"]
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 模块 1 — 市场快照 + PE 仪表盘（合并）
+# 模块 1 — 市场快照 + PE 仪表盘
 # ═══════════════════════════════════════════════════════════════════════════════
-st.markdown("## 📊 市场快照")
+section_title("📊", "市场快照")
 
-toggle_col, _ = st.columns([2, 6])
+toggle_col, _ = st.columns([2.2, 5.8])
 with toggle_col:
     use_manual = st.toggle("手动输入 PE（以 Gurufocus 为准）", value=False)
     if use_manual:
@@ -245,12 +407,14 @@ with toggle_col:
     else:
         current_pe = auto_pe
 
-left_col, right_col = st.columns([1, 2.2])
+left_col, right_col = st.columns([1, 2.3])
 
 with left_col:
-    st.metric("纳斯达克100 TTM PE",
-              f"{current_pe:.2f}" if current_pe else "—",
-              help="来自 QQQ trailingPE，可手动覆盖以 Wind / Gurufocus 数据为准")
+    st.metric(
+        "纳斯达克100 TTM PE",
+        f"{current_pe:.2f}" if current_pe else "—",
+        help="来自 QQQ trailingPE，可手动覆盖以 Gurufocus 数据为准",
+    )
     if qqqm_data["price"] and qqqm_data["prev_close"]:
         chg = (qqqm_data["price"] - qqqm_data["prev_close"]) / qqqm_data["prev_close"] * 100
         st.metric("QQQM 实时价", f"${qqqm_data['price']:.2f}", f"{chg:+.2f}%")
@@ -269,87 +433,125 @@ if current_pe:
 
     with right_col:
         gauge_max = 55
+        pe_val    = min(float(current_pe), gauge_max)
+
         gauge_fig = go.Figure(go.Indicator(
             mode="gauge+number",
-            value=min(float(current_pe), gauge_max),
-            number={"font": {"size": 40, "color": "#1D1D1F"}, "valueformat": ".1f", "prefix": "PE "},
-            title={"text": f"{cz['icon']} {cz['zone_name']}", "font": {"size": 20, "color": "#1D1D1F"}},
+            value=pe_val,
+            number={
+                "font": {
+                    "size": 48,
+                    "color": PRIMARY,
+                    "family": "IBM Plex Mono, monospace",
+                },
+                "valueformat": ".1f",
+                "prefix": "PE ",
+            },
+            title={
+                "text": f"{cz['icon']} {cz['zone_name']}",
+                "font": {
+                    "size": 18,
+                    "color": MUTED,
+                    "family": "IBM Plex Sans, sans-serif",
+                },
+            },
             gauge={
                 "axis": {
                     "range": [0, gauge_max],
                     "tickvals": [25, 28, 32, 35, 40],
-                    "tickcolor": "rgba(0,0,0,0.3)",
-                    "tickfont": {"color": "rgba(0,0,0,0.55)", "size": 11},
+                    "tickcolor": CAPTION,
+                    "tickfont": {"color": MUTED, "size": 11, "family": "IBM Plex Mono, monospace"},
                     "tickwidth": 1,
                 },
-                "bar": {"color": "#1D1D1F", "thickness": 0.04},
+                # Transparent bar so all zone colors remain visible;
+                # white threshold line acts as the needle pointer
+                "bar": {"color": "rgba(0,0,0,0)", "thickness": 0.01},
                 "bgcolor": "rgba(0,0,0,0)",
                 "borderwidth": 0,
-                "steps": [
-                    {"range": [0,   25],        "color": "#0e7490"},
-                    {"range": [25,  28],        "color": "#15803d"},
-                    {"range": [28,  32],        "color": "#4d7c0f"},
-                    {"range": [32,  35],        "color": "#a16207"},
-                    {"range": [35,  40],        "color": "#c2410c"},
-                    {"range": [40,  gauge_max], "color": "#8b0000"},
-                ],
+                "steps": GAUGE_STEPS,
                 "threshold": {
-                    "line": {"color": "#1D1D1F", "width": 4},
-                    "thickness": 0.85,
-                    "value": min(float(current_pe), gauge_max),
+                    "line": {"color": "rgba(255,255,255,0.95)", "width": 5},
+                    "thickness": 0.82,
+                    "value": pe_val,
                 },
             },
         ))
         gauge_fig.update_layout(
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            height=290,
+            height=295,
             margin=dict(l=40, r=40, t=50, b=0),
-            font={"color": "#1D1D1F"},
+            font={"color": PRIMARY, "family": "IBM Plex Sans, sans-serif"},
         )
         st.plotly_chart(gauge_fig, use_container_width=True, config={"displayModeBar": False})
 
-        # 区间图例（gauge 内部，居中对齐）
-        zone_legend = [
-            ("≤25",  "黄金坑",   "#0e7490"),
-            ("25-28","大甩卖",   "#15803d"),
-            ("28-32","小捡漏",   "#4d7c0f"),
-            ("32-35","正常发挥", "#a16207"),
-            ("35-40","有点贵",   "#c2410c"),
-            (">40",  "危险！别碰","#8b0000"),
-        ]
+        # ── Zone legend chips ──
         chips = ""
-        for rng, name, bg in zone_legend:
+        for rng, name, bg in ZONE_LEGEND:
             is_cur = (name == cz["zone_name"])
-            border = "2px solid #1D1D1F" if is_cur else "2px solid transparent"
-            scale  = "font-size:13px;font-weight:700;padding:5px 14px;" if is_cur else "font-size:11px;padding:4px 10px;opacity:0.7;"
-            chips += (f'<span style="background:{bg};color:white;border-radius:20px;'
-                      f'{scale}border:{border};display:inline-block;margin:3px;">'
-                      f'{rng}&nbsp;{name}</span>')
+            if is_cur:
+                chips += (
+                    f'<span style="background:{bg};color:#fff;border-radius:20px;'
+                    f'font-size:12.5px;font-weight:700;padding:6px 16px;'
+                    f'border:2px solid rgba(255,255,255,0.5);display:inline-block;margin:3px;'
+                    f'box-shadow:0 4px 14px {cz["shadow"]};'
+                    f'font-family:IBM Plex Sans,sans-serif;letter-spacing:0.01em;">'
+                    f'{rng}&nbsp;{name}</span>'
+                )
+            else:
+                chips += (
+                    f'<span style="background:rgba(28,25,23,0.04);color:{MUTED};'
+                    f'border-radius:20px;font-size:11px;font-weight:500;padding:4px 12px;'
+                    f'border:1px solid {BORDER};display:inline-block;margin:3px;'
+                    f'font-family:IBM Plex Sans,sans-serif;">'
+                    f'{rng}&nbsp;{name}</span>'
+                )
         st.markdown(
-            f'<div style="text-align:center;margin-top:-6px;margin-bottom:10px;">{chips}</div>',
+            f'<div style="text-align:center;margin-top:-8px;margin-bottom:10px;">{chips}</div>',
             unsafe_allow_html=True,
         )
 
-    # 操作建议横条
-    tc = cz["text_color"]
+    # ── Action recommendation bar ──
     st.markdown(f"""
-    <div class="action-bar" style="background:{cz['gradient']};color:{tc};">
+    <div class="action-bar" style="background:{cz['gradient']};color:#fff;
+         box-shadow:0 12px 48px {cz['shadow']},0 4px 12px rgba(28,25,23,0.12),
+                   inset 0 1px 0 rgba(255,255,255,0.22);">
       <div class="action-bar-left">
-        <p style="margin:0;font-size:11px;opacity:.6;text-transform:uppercase;letter-spacing:.12em;font-weight:500;">当前区间</p>
-        <p style="margin:6px 0 0;font-size:clamp(17px,3vw,24px);font-weight:800;letter-spacing:-.01em;">{cz['icon']} {cz['zone_name']} · {cz['range_label']}</p>
+        <p style="margin:0;font-size:10px;opacity:.6;text-transform:uppercase;
+                  letter-spacing:.14em;font-weight:600;font-family:'IBM Plex Sans',sans-serif;">
+          当前区间
+        </p>
+        <p style="margin:6px 0 0;font-size:clamp(16px,3vw,23px);font-weight:700;
+                  letter-spacing:-.015em;font-family:'IBM Plex Sans',sans-serif;">
+          {cz['icon']}&ensp;{cz['zone_name']}&ensp;·&ensp;{cz['range_label']}
+        </p>
       </div>
       <div class="action-bar-right">
-        <div><p class="ab-label">买入标的</p><p class="ab-value">{cz['target']}</p></div>
+        <div>
+          <p class="ab-label">买入标的</p>
+          <p class="ab-value">{cz['target']}</p>
+        </div>
         <div class="ab-divider"></div>
-        <div><p class="ab-label">买入倍数</p><p class="ab-value">{cz['multiplier']}</p></div>
+        <div>
+          <p class="ab-label">买入倍数</p>
+          <p class="ab-value">{cz['multiplier']}</p>
+        </div>
         <div class="ab-divider"></div>
-        <div><p class="ab-label">建议金额</p><p class="ab-value">{c_amt}</p></div>
+        <div>
+          <p class="ab-label">建议金额</p>
+          <p class="ab-value">{c_amt}</p>
+        </div>
         <div class="ab-divider"></div>
-        <div><p class="ab-label">结余变化</p><p class="ab-value">{c_res}</p></div>
+        <div>
+          <p class="ab-label">结余变化</p>
+          <p class="ab-value">{c_res}</p>
+        </div>
       </div>
     </div>
-    <p style="color:#6E6E73;font-size:12px;margin:8px 0 0 6px;letter-spacing:.01em;">{cz['reserve_note']}</p>
+    <p style="color:{CAPTION};font-size:12px;margin:8px 0 0 6px;letter-spacing:.01em;
+              font-family:'IBM Plex Sans',sans-serif;">
+      {cz['reserve_note']}
+    </p>
     """, unsafe_allow_html=True)
 else:
     st.warning("无法自动获取 PE，请开启手动输入。")
@@ -357,11 +559,11 @@ else:
 # ═══════════════════════════════════════════════════════════════════════════════
 # 模块 2 — QQQM 日 K 线图
 # ═══════════════════════════════════════════════════════════════════════════════
-st.markdown("## 📉 QQQM 日 K 线图")
+section_title("📉", "QQQM 日 K 线图")
 
 PERIOD_OPTS = {"1 月": "1mo", "3 月": "3mo", "6 月": "6mo", "1 年": "1y", "3 年": "3y", "全部": "max"}
-sel_label  = st.selectbox("时间窗口", list(PERIOD_OPTS.keys()), index=3, key="kline_period")
-kline_df   = fetch_history("QQQM", PERIOD_OPTS[sel_label])
+sel_label = st.selectbox("时间窗口", list(PERIOD_OPTS.keys()), index=3, key="kline_period")
+kline_df  = fetch_history("QQQM", PERIOD_OPTS[sel_label])
 
 if not kline_df.empty:
     df_k = kline_df.copy()
@@ -370,36 +572,55 @@ if not kline_df.empty:
     vol_colors = ["#22c55e" if c >= o else "#ef4444"
                   for c, o in zip(df_k["Close"], df_k["Open"])]
 
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
-                        vertical_spacing=0.02, row_heights=[0.7, 0.3])
-
+    fig = make_subplots(
+        rows=2, cols=1, shared_xaxes=True,
+        vertical_spacing=0.02, row_heights=[0.7, 0.3],
+    )
     fig.add_trace(go.Candlestick(
-        x=df_k.index, open=df_k["Open"], high=df_k["High"],
-        low=df_k["Low"], close=df_k["Close"],
-        increasing=dict(fillcolor="#22c55e", line=dict(color="#22c55e")),
-        decreasing=dict(fillcolor="#ef4444", line=dict(color="#ef4444")),
+        x=df_k.index,
+        open=df_k["Open"], high=df_k["High"],
+        low=df_k["Low"],   close=df_k["Close"],
+        increasing=dict(fillcolor="#22c55e", line=dict(color="#16a34a")),
+        decreasing=dict(fillcolor="#ef4444", line=dict(color="#dc2626")),
         name="QQQM", showlegend=True,
     ), row=1, col=1)
-
-    fig.add_trace(go.Scatter(x=df_k.index, y=df_k["MA20"],
-        line=dict(color="#fbbf24", width=1.5), name="MA20"), row=1, col=1)
-    fig.add_trace(go.Scatter(x=df_k.index, y=df_k["MA60"],
-        line=dict(color="#f97316", width=1.5), name="MA60"), row=1, col=1)
-
-    fig.add_trace(go.Bar(x=df_k.index, y=df_k["Volume"],
-        marker_color=vol_colors, name="成交量", showlegend=False), row=2, col=1)
+    fig.add_trace(go.Scatter(
+        x=df_k.index, y=df_k["MA20"],
+        line=dict(color="#D97706", width=1.5), name="MA20",
+    ), row=1, col=1)
+    fig.add_trace(go.Scatter(
+        x=df_k.index, y=df_k["MA60"],
+        line=dict(color="#B45309", width=1.5, dash="dot"), name="MA60",
+    ), row=1, col=1)
+    fig.add_trace(go.Bar(
+        x=df_k.index, y=df_k["Volume"],
+        marker_color=vol_colors, name="成交量", showlegend=False,
+        marker_line_width=0,
+    ), row=2, col=1)
 
     fig.update_layout(
-        paper_bgcolor="#FFFFFF", plot_bgcolor="#FFFFFF",
-        font=dict(color="#1D1D1F"), height=560,
-        margin=dict(l=0, r=0, t=20, b=0),
+        paper_bgcolor=CHART_BG,
+        plot_bgcolor=CHART_BG,
+        font=dict(color=MUTED, family="IBM Plex Sans, sans-serif"),
+        height=540,
+        margin=dict(l=0, r=0, t=16, b=0),
         xaxis_rangeslider_visible=False,
-        legend=dict(bgcolor="rgba(255,255,255,0.9)",
-                    bordercolor="rgba(0,0,0,0.08)", borderwidth=1),
+        legend=dict(
+            bgcolor="rgba(255,253,251,0.95)",
+            bordercolor=BORDER,
+            borderwidth=1,
+            font=dict(color=SECONDARY, size=12),
+        ),
     )
-    fig.update_xaxes(gridcolor="rgba(0,0,0,0.05)",
-                     rangebreaks=[dict(bounds=["sat", "mon"])])
-    fig.update_yaxes(gridcolor="rgba(0,0,0,0.05)")
+    fig.update_xaxes(
+        gridcolor=GRID, tickfont=dict(color=CAPTION, size=11),
+        rangebreaks=[dict(bounds=["sat", "mon"])],
+        showline=False,
+    )
+    fig.update_yaxes(
+        gridcolor=GRID, tickfont=dict(color=CAPTION, size=11),
+        showline=False,
+    )
     st.plotly_chart(fig, use_container_width=True)
 else:
     st.warning("无法加载 QQQM 历史数据。")
@@ -407,24 +628,24 @@ else:
 # ═══════════════════════════════════════════════════════════════════════════════
 # 模块 3 — QQQM 历史数据 + PE 表
 # ═══════════════════════════════════════════════════════════════════════════════
-st.markdown("## 📋 QQQM 历史数据 + PE 估算")
+section_title("📋", "QQQM 历史数据 + PE 估算")
 
-HIST_OPTS = {"近 30 天": "1mo", "近 90 天": "3mo", "近半年": "6mo", "近 1 年": "1y", "全部": "max"}
+HIST_OPTS  = {"近 30 天": "1mo", "近 90 天": "3mo", "近半年": "6mo", "近 1 年": "1y", "全部": "max"}
 hist_label = st.selectbox("数据范围", list(HIST_OPTS.keys()), index=2, key="hist_range")
 hist_df    = fetch_history("QQQM", HIST_OPTS[hist_label])
 
 if not hist_df.empty and current_pe and qqqm_data["price"]:
     cur_pe    = float(current_pe)
     cur_price = float(qqqm_data["price"])
-    # 历史PE = (历史收盘价 / 当前收盘价) × 当前爬取PE，直接用爬取值推算，无需EPS
-    hist_pe = (hist_df["Close"] / cur_price * cur_pe).round(2)
+    hist_pe   = (hist_df["Close"] / cur_price * cur_pe).round(2)
+
     tbl = pd.DataFrame({
-        "日期":   hist_df.index.strftime("%Y-%m-%d"),
-        "开盘":   hist_df["Open"].round(2),
-        "收盘":   hist_df["Close"].round(2),
-        "最高":   hist_df["High"].round(2),
-        "最低":   hist_df["Low"].round(2),
-        "PE":     hist_pe,
+        "日期":  hist_df.index.strftime("%Y-%m-%d"),
+        "开盘":  hist_df["Open"].round(2),
+        "收盘":  hist_df["Close"].round(2),
+        "最高":  hist_df["High"].round(2),
+        "最低":  hist_df["Low"].round(2),
+        "PE":    hist_pe,
     }).reset_index(drop=True)
     tbl["PE 区间"] = tbl["PE"].apply(lambda v: get_pe_zone(float(v))["zone_name"])
 
@@ -439,14 +660,13 @@ if not hist_df.empty and current_pe and qqqm_data["price"]:
         use_container_width=True, hide_index=True,
     )
     st.caption(
-        f"PE 基于爬取的实时 NDX PE（{cur_pe:.2f}）按价格比例推算，当日数值与实时一致。"
+        f"PE 基于爬取的实时 NDX PE（{cur_pe:.2f}）按价格比例推算。"
         "精确历史 PE 请参考 [Gurufocus](https://www.gurufocus.com/term/pe/QQQM/PE-Ratio/QQQM)。"
     )
 elif not current_pe:
     st.warning("无法获取当前 PE，请开启手动输入后刷新。")
 else:
     st.warning("无法加载 QQQM 历史数据。")
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 模块 5 — 策略速查表
@@ -477,9 +697,8 @@ with st.expander("📖 策略速查表（点击展开）", expanded=False):
 # ═══════════════════════════════════════════════════════════════════════════════
 # 模块 6 — 定投记录
 # ═══════════════════════════════════════════════════════════════════════════════
-st.markdown("## 💰 定投记录")
+section_title("💰", "定投记录")
 
-# CSV 导入 / 导出
 imp_col, exp_col, _ = st.columns([1.5, 1.5, 5])
 with imp_col:
     uploaded = st.file_uploader("导入 CSV", type="csv",
@@ -494,10 +713,11 @@ with imp_col:
 with exp_col:
     if st.session_state.records:
         csv_bytes = pd.DataFrame(st.session_state.records).to_csv(index=False).encode("utf-8")
-        st.download_button("📥 导出 CSV", data=csv_bytes,
-                           file_name=f"fire_tracker_{date.today()}.csv", mime="text/csv")
+        st.download_button(
+            "📥 导出 CSV", data=csv_bytes,
+            file_name=f"fire_tracker_{date.today()}.csv", mime="text/csv",
+        )
 
-# 新增记录表单
 default_pe_val  = float(current_pe) if current_pe else 30.0
 default_zone    = get_pe_zone(default_pe_val)
 default_amount  = float(default_zone["amount"])
@@ -509,18 +729,18 @@ default_reserve = (
 with st.expander("➕ 新增定投记录", expanded=len(st.session_state.records) == 0):
     f1, f2, f3, f4 = st.columns(4)
     with f1:
-        rec_date   = st.date_input("日期", value=date.today(), key="rec_date")
-        rec_pe     = st.number_input("当周 PE", min_value=0.0, value=default_pe_val,
-                                     step=0.1, format="%.2f", key="rec_pe")
+        rec_date = st.date_input("日期", value=date.today(), key="rec_date")
+        rec_pe   = st.number_input("当周 PE", min_value=0.0, value=default_pe_val,
+                                   step=0.1, format="%.2f", key="rec_pe")
     with f2:
         rec_target = st.selectbox("买入标的", ["VOO", "QQQM", "无（停止定投）"], key="rec_target")
         rec_amount = st.number_input("买入金额 ($)", min_value=0.0, value=default_amount,
                                      step=1.0, format="%.2f", key="rec_amount")
     with f3:
-        rec_price  = st.number_input("买入价格（填 0 自动获取）", min_value=0.0, value=0.0,
-                                     step=0.01, format="%.2f", key="rec_price")
-        rec_fee    = st.number_input("手续费 ($)", min_value=0.0, value=1.00,
-                                     step=0.01, format="%.2f", key="rec_fee")
+        rec_price = st.number_input("买入价格（填 0 自动获取）", min_value=0.0, value=0.0,
+                                    step=0.01, format="%.2f", key="rec_price")
+        rec_fee   = st.number_input("手续费 ($)", min_value=0.0, value=1.00,
+                                    step=0.01, format="%.2f", key="rec_fee")
     with f4:
         rec_reserve = st.number_input("本周留存 ($，负数=取用结余)", value=default_reserve,
                                       step=1.0, format="%.2f", key="rec_reserve")
@@ -538,9 +758,9 @@ with st.expander("➕ 新增定投记录", expanded=len(st.session_state.records
                 st.error("无法自动获取该日期价格，请手动填写。")
                 st.stop()
 
-        shares     = rec_amount / actual_price if actual_price > 0 else 0.0
-        prev_res   = st.session_state.records[-1].get("累计结余", 0) if st.session_state.records else 0
-        cum_res    = prev_res + rec_reserve
+        shares   = rec_amount / actual_price if actual_price > 0 else 0.0
+        prev_res = st.session_state.records[-1].get("累计结余", 0) if st.session_state.records else 0
+        cum_res  = prev_res + rec_reserve
 
         st.session_state.records.append({
             "日期":     rec_date.isoformat(),
@@ -556,7 +776,6 @@ with st.expander("➕ 新增定投记录", expanded=len(st.session_state.records
         st.success("记录已添加！")
         st.rerun()
 
-# 记录表格 + 实时盈亏
 if st.session_state.records:
     rdf = pd.DataFrame(st.session_state.records)
     qp  = qqqm_data["price"] or 0.0
@@ -567,30 +786,34 @@ if st.session_state.records:
         if "VOO"  in str(target): return vp
         return 0.0
 
-    rdf["当前市值"]       = (rdf["股数"] * rdf["买入标的"].apply(_cur_price)).round(2)
-    rdf["纯盈利 (不含费)"] = (rdf["当前市值"] - rdf["买入金额"]).round(2)
-    rdf["实际盈利 (含费)"] = (rdf["当前市值"] - rdf["买入金额"] - rdf["手续费"]).round(2)
+    rdf["当前市值"]        = (rdf["股数"] * rdf["买入标的"].apply(_cur_price)).round(2)
+    rdf["纯盈利 (不含费)"]  = (rdf["当前市值"] - rdf["买入金额"]).round(2)
+    rdf["实际盈利 (含费)"]  = (rdf["当前市值"] - rdf["买入金额"] - rdf["手续费"]).round(2)
 
     st.dataframe(rdf, use_container_width=True, hide_index=True)
 
-    # 汇总面板
-    st.markdown("### 汇总")
-    total_in   = rdf["买入金额"].sum()
-    total_mv   = rdf["当前市值"].sum()
-    total_pp   = rdf["纯盈利 (不含费)"].sum()
-    total_ap   = rdf["实际盈利 (含费)"].sum()
-    total_fee  = rdf["手续费"].sum()
-    last_res   = rdf["累计结余"].iloc[-1]
-    pct        = (total_mv - total_in) / total_in * 100 if total_in > 0 else 0
+    st.markdown(f"""
+    <div style="font-family:'IBM Plex Sans',sans-serif;font-size:0.95rem;
+                font-weight:600;color:{SECONDARY};margin:20px 0 12px;letter-spacing:-0.01em;">
+      汇总
+    </div>
+    """, unsafe_allow_html=True)
+
+    total_in  = rdf["买入金额"].sum()
+    total_mv  = rdf["当前市值"].sum()
+    total_pp  = rdf["纯盈利 (不含费)"].sum()
+    total_ap  = rdf["实际盈利 (含费)"].sum()
+    total_fee = rdf["手续费"].sum()
+    last_res  = rdf["累计结余"].iloc[-1]
+    pct       = (total_mv - total_in) / total_in * 100 if total_in > 0 else 0
 
     s1, s2, s3, s4, s5 = st.columns(5)
-    s1.metric("累计投入",       f"${total_in:,.2f}")
-    s2.metric("当前市值",       f"${total_mv:,.2f}", f"{pct:+.2f}%")
+    s1.metric("累计投入",        f"${total_in:,.2f}")
+    s2.metric("当前市值",        f"${total_mv:,.2f}", f"{pct:+.2f}%")
     s3.metric("纯盈利 (不含费)", f"${total_pp:,.2f}")
-    s4.metric("实际盈利 (含费)", f"${total_ap:,.2f}", f"累计手续费 ${total_fee:.2f}")
-    s5.metric("账户结余",       f"${last_res:,.2f}")
+    s4.metric("实际盈利 (含费)", f"${total_ap:,.2f}", f"手续费 ${total_fee:.2f}")
+    s5.metric("账户结余",        f"${last_res:,.2f}")
 
-    # 记录管理
     with st.expander("🗑️ 记录管理"):
         mg1, mg2 = st.columns(2)
         with mg1:
@@ -598,7 +821,7 @@ if st.session_state.records:
                 st.session_state.records = []
                 st.rerun()
         with mg2:
-            n = len(st.session_state.records)
+            n     = len(st.session_state.records)
             del_n = st.number_input("删除第 N 条（从 1 开始）",
                                     min_value=1, max_value=n, step=1, key="del_n")
             if st.button("删除该条", type="secondary"):
