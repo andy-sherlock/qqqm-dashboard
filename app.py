@@ -216,79 +216,79 @@ body::before {
 # ─── PE Zone Definitions ─────────────────────────────────────────────────────
 ZONES = [
     {
-        "zone_name": "危险！别碰", "range_label": "PE > 40",
+        "zone_name": "高危禁区", "range_label": "PE > 40",
         "icon": "🔴", "target": "—", "multiplier": "0×",
         "amount": 0, "reserve_change": 125, "reserve_sign": "+",
         "reserve_note": "本周 $125 全部留存账户",
-        "gradient": "linear-gradient(135deg, #7f1d1d 0%, #dc2626 100%)",
-        "shadow": "rgba(220,38,38,0.28)",
-        "table_bg": "#7f1d1d", "text_color": "#ffffff",
+        "gradient": "linear-gradient(135deg, #7f1d1d 0%, #b91c1c 100%)",
+        "shadow": "rgba(185,28,28,0.28)",
+        "table_bg": "#b91c1c", "text_color": "#ffffff",
     },
     {
-        "zone_name": "有点贵", "range_label": "35 < PE ≤ 40",
+        "zone_name": "虚高警戒", "range_label": "35 < PE ≤ 40",
         "icon": "🟠", "target": "VOO", "multiplier": "0.6×",
         "amount": 75, "reserve_change": 50, "reserve_sign": "+",
         "reserve_note": "本周留存 $50 进入账户结余",
-        "gradient": "linear-gradient(135deg, #7c2d12 0%, #ea580c 100%)",
-        "shadow": "rgba(234,88,12,0.28)",
-        "table_bg": "#7c2d12", "text_color": "#ffffff",
+        "gradient": "linear-gradient(135deg, #7c2d12 0%, #c2410c 100%)",
+        "shadow": "rgba(194,65,12,0.28)",
+        "table_bg": "#c2410c", "text_color": "#ffffff",
     },
     {
-        "zone_name": "正常发挥", "range_label": "32 < PE ≤ 35",
+        "zone_name": "均衡配置", "range_label": "32 < PE ≤ 35",
         "icon": "🟡", "target": "VOO", "multiplier": "1×",
         "amount": 125, "reserve_change": 0, "reserve_sign": "",
         "reserve_note": "本周不留存",
-        "gradient": "linear-gradient(135deg, #713f12 0%, #ca8a04 100%)",
-        "shadow": "rgba(202,138,4,0.28)",
-        "table_bg": "#713f12", "text_color": "#ffffff",
+        "gradient": "linear-gradient(135deg, #713f12 0%, #a16207 100%)",
+        "shadow": "rgba(161,98,7,0.28)",
+        "table_bg": "#a16207", "text_color": "#ffffff",
     },
     {
-        "zone_name": "小捡漏", "range_label": "28 < PE ≤ 32",
+        "zone_name": "价值洼地", "range_label": "28 < PE ≤ 32",
         "icon": "🟢", "target": "QQQM", "multiplier": "1.5×",
         "amount": 187, "reserve_change": 62, "reserve_sign": "-",
         "reserve_note": "从账户结余取用 $62",
-        "gradient": "linear-gradient(135deg, #14532d 0%, #16a34a 100%)",
-        "shadow": "rgba(22,163,74,0.25)",
-        "table_bg": "#14532d", "text_color": "#ffffff",
+        "gradient": "linear-gradient(135deg, #14532d 0%, #15803d 100%)",
+        "shadow": "rgba(21,128,61,0.25)",
+        "table_bg": "#15803d", "text_color": "#ffffff",
     },
     {
-        "zone_name": "大甩卖", "range_label": "25 < PE ≤ 28",
+        "zone_name": "超值猎场", "range_label": "25 < PE ≤ 28",
         "icon": "🩵", "target": "QQQM", "multiplier": "2×",
         "amount": 250, "reserve_change": 125, "reserve_sign": "-",
         "reserve_note": "从账户结余取用 $125",
-        "gradient": "linear-gradient(135deg, #155e75 0%, #0891b2 100%)",
-        "shadow": "rgba(8,145,178,0.25)",
-        "table_bg": "#155e75", "text_color": "#ffffff",
+        "gradient": "linear-gradient(135deg, #155e75 0%, #0e7490 100%)",
+        "shadow": "rgba(14,116,144,0.25)",
+        "table_bg": "#0e7490", "text_color": "#ffffff",
     },
     {
-        "zone_name": "黄金坑", "range_label": "PE ≤ 25",
+        "zone_name": "黄金大底", "range_label": "PE ≤ 25",
         "icon": "💙", "target": "QQQM", "multiplier": "2.5× + 全清结余",
         "amount": 312, "reserve_change": None, "reserve_sign": "",
         "reserve_note": "$312 定投 + 累计结余全部一次性买入 QQQM",
-        "gradient": "linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)",
-        "shadow": "rgba(37,99,235,0.28)",
-        "table_bg": "#1e3a8a", "text_color": "#ffffff",
+        "gradient": "linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%)",
+        "shadow": "rgba(29,78,216,0.28)",
+        "table_bg": "#1d4ed8", "text_color": "#ffffff",
     },
 ]
 
 ZONE_BG_MAP = {z["zone_name"]: z["table_bg"] for z in ZONES}
 
-# Gauge step colors — 6 clearly distinct colors: blue→cyan→green→yellow→orange→red
+# Gauge step colors — unified with table colors (700-series, good contrast with white)
 GAUGE_STEPS = [
-    {"range": [0,   25],  "color": "#2563eb"},  # 黄金坑  blue-600
-    {"range": [25,  28],  "color": "#0891b2"},  # 大甩卖  cyan-600
-    {"range": [28,  32],  "color": "#16a34a"},  # 小捡漏  green-600
-    {"range": [32,  35],  "color": "#ca8a04"},  # 正常发挥 yellow-600
-    {"range": [35,  40],  "color": "#ea580c"},  # 有点贵  orange-600
-    {"range": [40,  55],  "color": "#dc2626"},  # 危险    red-600
+    {"range": [0,   25],  "color": "#1d4ed8"},  # 黄金大底  blue-700
+    {"range": [25,  28],  "color": "#0e7490"},  # 超值猎场  cyan-700
+    {"range": [28,  32],  "color": "#15803d"},  # 价值洼地  green-700
+    {"range": [32,  35],  "color": "#a16207"},  # 均衡配置  yellow-700
+    {"range": [35,  40],  "color": "#c2410c"},  # 虚高警戒  orange-700
+    {"range": [40,  55],  "color": "#b91c1c"},  # 高危禁区  red-700
 ]
 ZONE_LEGEND = [
-    ("≤25",   "黄金坑",    "#2563eb"),
-    ("25-28",  "大甩卖",   "#0891b2"),
-    ("28-32",  "小捡漏",   "#16a34a"),
-    ("32-35",  "正常发挥", "#ca8a04"),
-    ("35-40",  "有点贵",   "#ea580c"),
-    (">40",    "危险！别碰","#dc2626"),
+    ("≤25",   "黄金大底",  "#1d4ed8"),
+    ("25-28",  "超值猎场", "#0e7490"),
+    ("28-32",  "价值洼地", "#15803d"),
+    ("32-35",  "均衡配置", "#a16207"),
+    ("35-40",  "虚高警戒", "#c2410c"),
+    (">40",    "高危禁区", "#b91c1c"),
 ]
 
 
@@ -323,22 +323,25 @@ def section_title(icon: str, text: str):
     """, unsafe_allow_html=True)
 
 
-def build_gauge_svg(pe_val: float, gauge_max: float = 55) -> str:
-    """SVG semicircle gauge with proper needle from center pointing to current PE."""
+def build_gauge_svg(pe_val: float) -> str:
+    """SVG semicircle gauge — balanced display range PE 20-45, needle from center hub."""
+    GAUGE_MIN, GAUGE_MAX = 20.0, 45.0
     cx, cy = 200, 162
     r_out, r_in = 138, 86
 
+    # Uses -700 colors to match the strategy table backgrounds exactly
     zone_defs = [
-        (0,         25, "#2563eb"),
-        (25,        28, "#0891b2"),
-        (28,        32, "#16a34a"),
-        (32,        35, "#ca8a04"),
-        (35,        40, "#ea580c"),
-        (40, gauge_max, "#dc2626"),
+        (20,        25, "#1d4ed8"),  # 黄金大底  blue-700
+        (25,        28, "#0e7490"),  # 超值猎场  cyan-700
+        (28,        32, "#15803d"),  # 价值洼地  green-700
+        (32,        35, "#a16207"),  # 均衡配置  yellow-700
+        (35,        40, "#c2410c"),  # 虚高警戒  orange-700
+        (40, GAUGE_MAX, "#b91c1c"),  # 高危禁区  red-700
     ]
 
     def val_to_rad(v: float) -> float:
-        return math.pi * (1.0 - v / gauge_max)
+        v = max(GAUGE_MIN, min(v, GAUGE_MAX))
+        return math.pi * (1.0 - (v - GAUGE_MIN) / (GAUGE_MAX - GAUGE_MIN))
 
     def pt(r: float, theta: float):
         return cx + r * math.cos(theta), cy - r * math.sin(theta)
@@ -371,7 +374,7 @@ def build_gauge_svg(pe_val: float, gauge_max: float = 55) -> str:
             f'x2="{x2:.1f}" y2="{y2:.1f}" stroke="white" stroke-width="2"/>'
         )
 
-    # Tick labels
+    # Tick labels at zone boundaries + end caps
     lbls = ""
     for v in [25, 28, 32, 35, 40]:
         a = val_to_rad(v)
@@ -381,9 +384,20 @@ def build_gauge_svg(pe_val: float, gauge_max: float = 55) -> str:
             f'dominant-baseline="middle" fill="#A8A29E" '
             f'font-size="9.5" font-family="IBM Plex Mono,monospace">{v}</text>'
         )
+    # End labels showing the display range
+    lx_l, ly_l = pt(r_out + 17, math.pi)
+    lx_r, ly_r = pt(r_out + 17, 0)
+    lbls += (
+        f'<text x="{lx_l:.1f}" y="{ly_l:.1f}" text-anchor="middle" '
+        f'dominant-baseline="middle" fill="#C4BFBB" '
+        f'font-size="9" font-family="IBM Plex Mono,monospace">20</text>'
+        f'<text x="{lx_r:.1f}" y="{ly_r:.1f}" text-anchor="middle" '
+        f'dominant-baseline="middle" fill="#C4BFBB" '
+        f'font-size="9" font-family="IBM Plex Mono,monospace">45</text>'
+    )
 
-    # Needle — triangle from center hub to arc
-    pe_c = min(float(pe_val), gauge_max)
+    # Needle — triangle from center hub pointing toward arc
+    pe_c = max(GAUGE_MIN, min(float(pe_val), GAUGE_MAX))
     na = val_to_rad(pe_c)
     ntx, nty = pt(r_out * 0.84, na)
     perp = na + math.pi / 2
@@ -530,8 +544,7 @@ if current_pe:
     c_res = fmt_reserve(cz)
 
     with right_col:
-        gauge_max = 55
-        pe_val    = min(float(current_pe), gauge_max)
+        pe_val = float(current_pe)
 
         # ── Zone name badge ──
         zone_badge = (
@@ -541,8 +554,8 @@ if current_pe:
             f'{cz["icon"]}&ensp;{cz["zone_name"]}</span></div>'
         )
 
-        # ── SVG gauge with proper needle from center ──
-        gauge_svg = build_gauge_svg(pe_val, gauge_max)
+        # ── SVG gauge with balanced 20-45 display range ──
+        gauge_svg = build_gauge_svg(pe_val)
 
         # ── PE value — integrated below the arc ──
         pe_display = (
