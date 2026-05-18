@@ -460,7 +460,7 @@ def build_gauge_svg(pe_val: float) -> str:
 @st.cache_data(ttl=600)
 def fetch_qqq_info() -> dict:
     try:
-        info = yf.Ticker("QQQ").info
+        info = yf.Ticker("QQQM").info
         return {"pe": info.get("trailingPE")}
     except Exception:
         return {"pe": None}
