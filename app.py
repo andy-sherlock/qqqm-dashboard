@@ -324,102 +324,135 @@ def section_title(icon: str, text: str):
 
 
 def build_gauge_svg(pe_val: float) -> str:
-    """SVG semicircle gauge — balanced display range PE 20-45, needle from center hub."""
+    """240° wide-sweep gauge — automotive speedometer arc from 7 oʼclock to 5 oʼclock."""
     GAUGE_MIN, GAUGE_MAX = 20.0, 45.0
-    cx, cy = 200, 162
-    r_out, r_in = 138, 86
+    cx, cy   = 200, 185          # arc centre
+    r_out    = 155               # outer radius of coloured band
+    r_in     = 98                # inner radius → 57px band
+    START_DEG = 210.0            # PE 20 → ~7 oʼclock (lower-left)
+    SWEEP_DEG = 240.0            # 210° → -30° (330°) → 5 oʼclock (lower-right)
 
-    # Uses -700 colors to match the strategy table backgrounds exactly
     zone_defs = [
-        (20,        25, "#1d4ed8"),  # 黄金大底  blue-700
-        (25,        28, "#0e7490"),  # 超值猎场  cyan-700
-        (28,        32, "#15803d"),  # 价值洼地  green-700
-        (32,        35, "#a16207"),  # 均衡配置  yellow-700
-        (35,        40, "#c2410c"),  # 虚高警戒  orange-700
-        (40, GAUGE_MAX, "#b91c1c"),  # 高危禁区  red-700
+        (20,        25, "#1d4ed8"),
+        (25,        28, "#0e7490"),
+        (28,        32, "#15803d"),
+        (32,        35, "#a16207"),
+        (35,        40, "#c2410c"),
+        (40, GAUGE_MAX, "#b91c1c"),
     ]
 
     def val_to_rad(v: float) -> float:
         v = max(GAUGE_MIN, min(v, GAUGE_MAX))
-        return math.pi * (1.0 - (v - GAUGE_MIN) / (GAUGE_MAX - GAUGE_MIN))
+        frac = (v - GAUGE_MIN) / (GAUGE_MAX - GAUGE_MIN)
+        return math.radians(START_DEG - frac * SWEEP_DEG)
 
     def pt(r: float, theta: float):
         return cx + r * math.cos(theta), cy - r * math.sin(theta)
 
-    # Colored arc segments
+    # ── Background track (grey arc spanning 240°) ──
+    ba1 = val_to_rad(GAUGE_MIN)   # 210°
+    ba2 = val_to_rad(GAUGE_MAX)   # -30°
+    bx1, by1 = pt(r_out, ba1); bx2, by2 = pt(r_out, ba2)
+    bi1, bj1 = pt(r_in,  ba1); bi2, bj2 = pt(r_in,  ba2)
+    bg_arc = (
+        f'<path d="M {bx1:.1f},{by1:.1f} '
+        f'A {r_out},{r_out} 0 0 0 {bx2:.1f},{by2:.1f} '
+        f'L {bi2:.1f},{bj2:.1f} '
+        f'A {r_in},{r_in} 0 0 1 {bi1:.1f},{bj1:.1f} Z" '
+        f'fill="#E7E2D9" opacity="0.85"/>'
+    )
+
+    # ── Coloured zone arcs ──
     arcs = ""
     for v1, v2, color in zone_defs:
         a1, a2 = val_to_rad(v1), val_to_rad(v2)
-        ox1, oy1 = pt(r_out, a1)
-        ox2, oy2 = pt(r_out, a2)
-        ix1, iy1 = pt(r_in, a1)
-        ix2, iy2 = pt(r_in, a2)
-        laf = 1 if abs(math.degrees(a1 - a2)) > 180 else 0
+        ox1, oy1 = pt(r_out, a1); ox2, oy2 = pt(r_out, a2)
+        ix1, iy1 = pt(r_in,  a1); ix2, iy2 = pt(r_in,  a2)
         arcs += (
             f'<path d="M {ox1:.1f},{oy1:.1f} '
-            f'A {r_out},{r_out} 0 {laf} 0 {ox2:.1f},{oy2:.1f} '
+            f'A {r_out},{r_out} 0 0 0 {ox2:.1f},{oy2:.1f} '
             f'L {ix2:.1f},{iy2:.1f} '
-            f'A {r_in},{r_in} 0 {laf} 1 {ix1:.1f},{iy1:.1f} Z" '
+            f'A {r_in},{r_in} 0 0 1 {ix1:.1f},{iy1:.1f} Z" '
             f'fill="{color}"/>'
         )
 
-    # White separator lines at zone boundaries
+    # ── Tick marks: major every 5, minor every 1 ──
+    ticks = ""
+    for v in range(20, 46):
+        a = val_to_rad(float(v))
+        if v % 5 == 0:
+            x1, y1 = pt(r_in - 4, a); x2, y2 = pt(r_out + 5, a)
+            ticks += (f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+                      f'stroke="#1c1917" stroke-width="1.5"/>')
+        else:
+            x1, y1 = pt(r_out - 14, a); x2, y2 = pt(r_out + 4, a)
+            ticks += (f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+                      f'stroke="#A8A29E" stroke-width="0.7"/>')
+
+    # ── Zone separator lines (subtle, at boundaries) ──
     seps = ""
     for v in [25, 28, 32, 35, 40]:
         a = val_to_rad(v)
-        x1, y1 = pt(r_in, a)
-        x2, y2 = pt(r_out, a)
-        seps += (
-            f'<line x1="{x1:.1f}" y1="{y1:.1f}" '
-            f'x2="{x2:.1f}" y2="{y2:.1f}" stroke="white" stroke-width="2"/>'
-        )
+        x1, y1 = pt(r_in - 2, a); x2, y2 = pt(r_out + 3, a)
+        seps += (f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+                 f'stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.9"/>')
 
-    # Tick labels at zone boundaries + end caps
+    # ── Scale labels (outside the arc) ──
     lbls = ""
-    for v in [25, 28, 32, 35, 40]:
+    for v in [20, 25, 30, 35, 40, 45]:
         a = val_to_rad(v)
-        lx, ly = pt(r_out + 17, a)
+        lx, ly = pt(r_out + 24, a)
         lbls += (
             f'<text x="{lx:.1f}" y="{ly:.1f}" text-anchor="middle" '
-            f'dominant-baseline="middle" fill="#A8A29E" '
-            f'font-size="9.5" font-family="IBM Plex Mono,monospace">{v}</text>'
+            f'dominant-baseline="middle" fill="#44403C" '
+            f'font-size="13" font-family="IBM Plex Mono,monospace" '
+            f'font-weight="500">{v}</text>'
         )
-    # End labels showing the display range
-    lx_l, ly_l = pt(r_out + 17, math.pi)
-    lx_r, ly_r = pt(r_out + 17, 0)
-    lbls += (
-        f'<text x="{lx_l:.1f}" y="{ly_l:.1f}" text-anchor="middle" '
-        f'dominant-baseline="middle" fill="#C4BFBB" '
-        f'font-size="9" font-family="IBM Plex Mono,monospace">20</text>'
-        f'<text x="{lx_r:.1f}" y="{ly_r:.1f}" text-anchor="middle" '
-        f'dominant-baseline="middle" fill="#C4BFBB" '
-        f'font-size="9" font-family="IBM Plex Mono,monospace">45</text>'
-    )
 
-    # Needle — triangle from center hub pointing toward arc
+    # ── Current PE & zone colour ──
     pe_c = max(GAUGE_MIN, min(float(pe_val), GAUGE_MAX))
+    pe_color = "#78716C"
+    for v1, v2, zc in zone_defs:
+        if v1 <= pe_c < v2 or (v2 == GAUGE_MAX and pe_c == v2):
+            pe_color = zc
+            break
+
+    # ── Needle (slender, dark) ──
     na = val_to_rad(pe_c)
-    ntx, nty = pt(r_out * 0.84, na)
+    ntx, nty = pt(r_out + 10, na)    # tip beyond outer arc
+    tail_r = 28                       # counterweight tail length
+    t_a = na + math.pi
+    ttx, tty = cx + tail_r * math.cos(t_a), cy - tail_r * math.sin(t_a)
     perp = na + math.pi / 2
-    hw = 5.0
+    hw = 3.0                          # half-width at base
     b1x = cx + hw * math.cos(perp); b1y = cy - hw * math.sin(perp)
     b2x = cx - hw * math.cos(perp); b2y = cy + hw * math.sin(perp)
-    pts = f"{ntx:.1f},{nty:.1f} {b1x:.1f},{b1y:.1f} {b2x:.1f},{b2y:.1f}"
+    npts = f"{ntx:.1f},{nty:.1f} {b1x:.1f},{b1y:.1f} {ttx:.1f},{tty:.1f} {b2x:.1f},{b2y:.1f}"
     needle = (
-        f'<polygon points="{pts}" fill="rgba(28,25,23,0.15)" transform="translate(0,3)"/>'
-        f'<polygon points="{pts}" fill="white" stroke="rgba(28,25,23,0.12)" stroke-width="1.2"/>'
+        f'<polygon points="{npts}" fill="#1c1917" stroke="#B45309" stroke-width="0.5"/>'
     )
 
-    # Center hub
+    # ── Centre hub ──
     hub = (
-        f'<circle cx="{cx}" cy="{cy}" r="12" fill="white" stroke="#E7E2D9" stroke-width="1.5"/>'
-        f'<circle cx="{cx}" cy="{cy}" r="5" fill="#B45309"/>'
+        f'<circle cx="{cx}" cy="{cy}" r="7" fill="#292524"/>'
+        f'<circle cx="{cx}" cy="{cy}" r="2.5" fill="#B45309"/>'
+    )
+
+    # ── Readout — centred below the arc ──
+    ry = cy + 68
+    readout = (
+        f'<text x="{cx}" y="{ry}" text-anchor="middle" dominant-baseline="middle" '
+        f'font-family="IBM Plex Mono,monospace" font-size="38" font-weight="600" '
+        f'fill="{pe_color}" letter-spacing="-0.02em">{pe_c:.1f}</text>'
+        f'<text x="{cx}" y="{ry + 30}" text-anchor="middle" dominant-baseline="middle" '
+        f'font-family="IBM Plex Mono,monospace" font-size="12" fill="#A8A29E" '
+        f'letter-spacing="0.18em">P / E</text>'
     )
 
     return (
-        f'<svg viewBox="0 0 400 195" xmlns="http://www.w3.org/2000/svg" '
+        f'<svg viewBox="0 0 400 310" xmlns="http://www.w3.org/2000/svg" '
         f'style="width:100%;overflow:visible">'
-        f'{arcs}{seps}{lbls}{needle}{hub}</svg>'
+        f'{bg_arc}{arcs}{ticks}{seps}{lbls}{needle}{hub}{readout}</svg>'
     )
 
 
@@ -553,21 +586,65 @@ if current_pe:
             f'font-weight:700;letter-spacing:-0.01em;color:{cz["table_bg"]};">'
             f'{cz["icon"]}&ensp;{cz["zone_name"]}</span></div>'
         )
+        st.html(zone_badge)
 
-        # ── SVG gauge with balanced 20-45 display range ──
-        gauge_svg = build_gauge_svg(pe_val)
-
-        # ── PE value — integrated below the arc ──
-        pe_display = (
-            f'<div style="text-align:center;margin-top:-10px;margin-bottom:4px;">'
-            f'<span style="font-family:\'IBM Plex Mono\',monospace;font-size:12px;'
-            f'color:{CAPTION};letter-spacing:0.07em;text-transform:uppercase;">PE</span>'
-            f'<span style="font-family:\'IBM Plex Mono\',monospace;font-size:38px;'
-            f'font-weight:600;color:{PRIMARY};letter-spacing:-0.03em;margin-left:6px;">'
-            f'{pe_val:.1f}</span></div>'
+        # ── Plotly gauge — clean semicircular, no frame, needle pointer only ──
+        gauge_fig = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=min(pe_val, 45.0),
+            number={"font": {"size": 44, "color": "#1c1917", "family": "IBM Plex Mono"},
+                    "valueformat": ".1f"},
+            title={"text": "TTM P/E",
+                   "font": {"size": 13, "color": "#A8A29E", "family": "IBM Plex Sans"}},
+            gauge={
+                "axis": {
+                    "range": [20, 45],
+                    "tickvals": [20, 25, 28, 32, 35, 40, 45],
+                    "tickcolor": "#78716C",
+                    "tickfont": {"color": "#78716C", "size": 10, "family": "IBM Plex Mono"},
+                    "tickwidth": 1,
+                },
+                "bar": {"thickness": 0},           # no path trace
+                "bgcolor": "rgba(0,0,0,0)",
+                "borderwidth": 0,
+                "steps": [
+                    {"range": [20, 25], "color": "#1d4ed8"},
+                    {"range": [25, 28], "color": "#0e7490"},
+                    {"range": [28, 32], "color": "#15803d"},
+                    {"range": [32, 35], "color": "#a16207"},
+                    {"range": [35, 40], "color": "#c2410c"},
+                    {"range": [40, 45], "color": "#b91c1c"},
+                ],
+                "threshold": {
+                    "line": {"color": "#1c1917", "width": 3.5},
+                    "thickness": 0.85,              # longer needle line
+                    "value": min(pe_val, 45.0),
+                },
+            },
+        ))
+        gauge_fig.update_layout(
+            paper_bgcolor="rgba(255,255,255,0)",
+            plot_bgcolor="rgba(255,255,255,0)",
+            height=270,
+            margin=dict(l=30, r=30, t=25, b=0),
+            font={"color": "#44403C"},
         )
-
-        st.markdown(zone_badge + gauge_svg + pe_display, unsafe_allow_html=True)
+        # Inline CSS to kill Plotly's container border/frame
+        st.html("""
+        <style>
+        .stPlotlyChart {
+            border: none !important;
+            box-shadow: none !important;
+            background: transparent !important;
+        }
+        .stPlotlyChart > div {
+            border: none !important;
+            box-shadow: none !important;
+            background: transparent !important;
+        }
+        </style>
+        """)
+        st.plotly_chart(gauge_fig, width="stretch", config={"displayModeBar": False})
 
         # ── Zone legend chips — inactive chips keep their zone color at low opacity ──
         chips = ""
@@ -706,7 +783,7 @@ if not kline_df.empty:
         gridcolor=GRID, tickfont=dict(color=CAPTION, size=11),
         showline=False,
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 else:
     st.warning("无法加载 QQQM 历史数据。")
 
@@ -742,7 +819,7 @@ if not hist_df.empty and current_pe and qqqm_data["price"]:
         tbl.style
             .format({"开盘": "{:.2f}", "收盘": "{:.2f}", "最高": "{:.2f}", "最低": "{:.2f}", "PE": "{:.2f}"})
             .map(_style_zone, subset=["PE 区间"]),
-        use_container_width=True, hide_index=True,
+        width="stretch", hide_index=True,
     )
     st.caption(
         f"PE 基于爬取的实时 NDX PE（{cur_pe:.2f}）按价格比例推算。"
@@ -775,7 +852,7 @@ with st.expander("📖 策略速查表（点击展开）", expanded=False):
                       if v in ZONE_BG_MAP else "",
             subset=["区间名"],
         ),
-        use_container_width=True, hide_index=True,
+        width="stretch", hide_index=True,
     )
     st.caption("边界规则：PE 恰好等于边界值时（如 35 或 32），按**较低**区间执行。")
 
@@ -830,7 +907,7 @@ with st.expander("➕ 新增定投记录", expanded=len(st.session_state.records
         rec_reserve = st.number_input("本周留存 ($，负数=取用结余)", value=default_reserve,
                                       step=1.0, format="%.2f", key="rec_reserve")
         st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-        submit = st.button("✅ 提交记录", use_container_width=True, key="submit_rec")
+        submit = st.button("✅ 提交记录", width="stretch", key="submit_rec")
 
     if submit:
         actual_price = rec_price
@@ -875,7 +952,7 @@ if st.session_state.records:
     rdf["纯盈利 (不含费)"]  = (rdf["当前市值"] - rdf["买入金额"]).round(2)
     rdf["实际盈利 (含费)"]  = (rdf["当前市值"] - rdf["买入金额"] - rdf["手续费"]).round(2)
 
-    st.dataframe(rdf, use_container_width=True, hide_index=True)
+    st.dataframe(rdf, width="stretch", hide_index=True)
 
     st.markdown(f"""
     <div style="font-family:'IBM Plex Sans',sans-serif;font-size:0.95rem;
