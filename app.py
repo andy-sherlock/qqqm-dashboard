@@ -458,106 +458,80 @@ def build_gauge_svg(pe_val: float) -> str:
 
 
 # ─── Data Fetching (cached) ───────────────────────────────────────────────────
-# Strategy: cached inner functions raise on failure so Streamlit never
-# caches a None/error result.  Outer wrappers catch and return safe dicts.
+# Key insight: Yahoo Finance v10 API (info/fast_info) is aggressively rate-limited
+# on shared cloud IPs.  The v8 chart API (download/history) has looser limits.
+# Strategy: use v8 for prices, v10 for PE with long cache + gentle retry.
 
 
-def _yf_retry(fn, max_tries=3, base_sleep=1.5):
-    """Call *fn* up to *max_tries* times with exponential backoff."""
-    for i in range(max_tries):
-        try:
-            return fn()
-        except Exception:
-            if i == max_tries - 1:
-                raise
-            time.sleep(base_sleep * (2 ** i))
-
-
-@st.cache_data(ttl=600, show_spinner=False)
-def _fetch_qqq_info_cached() -> dict:
-    """Cached inner — raises on failure so Streamlit won't cache the miss."""
-    for ticker in ("QQQM", "QQQ"):
-        def _try():
-            pe = yf.Ticker(ticker).info.get("trailingPE")
-            if pe is None:
-                raise ValueError(f"{ticker} trailingPE is None")
-            return {"pe": float(pe)}
-        pe_data = _yf_retry(_try, max_tries=2, base_sleep=1.5)
-        if pe_data["pe"] is not None:
-            return pe_data
-    raise RuntimeError("无法获取纳斯达克100 PE 数据 — 所有数据源均失败")
-
-
+@st.cache_data(ttl=3600, show_spinner=False)               # PE changes slowly — 1 h cache
 def fetch_qqq_info() -> dict:
-    """Public wrapper — returns safe dict even on error (never caches failure)."""
-    try:
-        return _fetch_qqq_info_cached()
-    except Exception:
-        return {"pe": None}
+    """Fetch Nasdaq-100 trailing PE.  Long cache, gentle retry."""
+    for ticker in ("QQQM", "QQQ"):
+        for attempt in range(3):
+            try:
+                pe = yf.Ticker(ticker).info.get("trailingPE")
+                if pe is not None:
+                    return {"pe": float(pe)}
+            except Exception:
+                pass
+            time.sleep(3.0)                                 # generous backoff
+    return {"pe": None}
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def _fetch_current_price_cached(ticker: str) -> dict:
-    """Cached inner — raises on failure."""
-    # Try fast_info first (lightweight), fall back to info dict
-    for attempt in range(3):
-        try:
-            t = yf.Ticker(ticker)
-            fi = t.fast_info
-            p, pc = float(fi.last_price), float(fi.previous_close)
-            if p and pc:
-                return {"price": p, "prev_close": pc}
-        except Exception:
-            if attempt < 2:
-                time.sleep(1.5)
-    # Fallback: full info dict (more robust on some platforms)
-    for attempt in range(2):
-        try:
-            info = yf.Ticker(ticker).info
-            p = info.get("regularMarketPrice") or info.get("currentPrice")
-            pc = info.get("regularMarketPreviousClose") or info.get("previousClose")
-            if p and pc:
-                return {"price": float(p), "prev_close": float(pc)}
-        except Exception:
-            if attempt < 1:
-                time.sleep(1)
-    raise RuntimeError(f"无法获取 {ticker} 价格 — fast_info 和 info 均失败")
+def _fetch_price_via_download(ticker: str) -> dict:
+    """Get latest price via yf.download (v8 chart API — more reliable)."""
+    df = yf.download(ticker, period="3d", auto_adjust=True, progress=False)
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.droplevel(1)
+    df = df.dropna(subset=["Close"])
+    if len(df) >= 2:
+        return {"price": float(df["Close"].iloc[-1]),
+                "prev_close": float(df["Close"].iloc[-2])}
+    raise RuntimeError(f"download returned < 2 rows for {ticker}")
 
 
 def fetch_current_price(ticker: str) -> dict:
-    """Public wrapper — returns safe dict even on error."""
+    """Get current price.  v8 download first, fast_info fallback."""
     try:
-        return _fetch_current_price_cached(ticker)
+        return _fetch_price_via_download(ticker)
     except Exception:
-        return {"price": None, "prev_close": None}
+        pass
+    # Fallback: fast_info (v10 — may be rate-limited)
+    try:
+        fi = yf.Ticker(ticker).fast_info
+        p, pc = float(fi.last_price), float(fi.previous_close)
+        if p and pc:
+            return {"price": p, "prev_close": pc}
+    except Exception:
+        pass
+    return {"price": None, "prev_close": None}
 
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_history(ticker: str, period: str) -> pd.DataFrame:
-    def _try():
+    """Historical OHLCV via yf.download (v8 — rarely rate-limited)."""
+    try:
         df = yf.download(ticker, period=period, auto_adjust=True, progress=False)
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.droplevel(1)
         return df.dropna(subset=["Close"])
-    try:
-        return _yf_retry(_try, max_tries=2, base_sleep=1.0)
     except Exception:
         return pd.DataFrame()
 
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_price_on_date(ticker: str, target_date: date) -> float | None:
+    """Historical close price on a specific date."""
     start = target_date - timedelta(days=7)
     end   = target_date + timedelta(days=2)
-    def _try():
+    try:
         df = yf.download(ticker, start=start, end=end, auto_adjust=True, progress=False)
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.droplevel(1)
         if df.empty:
-            raise ValueError("empty result")
+            return None
         return float(df["Close"].iloc[-1])
-    try:
-        return _yf_retry(_try, max_tries=2, base_sleep=1.0)
     except Exception:
         return None
 
@@ -594,10 +568,11 @@ st.markdown(f"""
 if "force_refresh" not in st.session_state:
     st.session_state.force_refresh = False
 
-# ── Manual refresh: clear caches so yfinance re-fetches ──
+# ── Manual refresh: clear all data caches ──
 if st.session_state.force_refresh:
-    _fetch_qqq_info_cached.clear()
-    _fetch_current_price_cached.clear()
+    fetch_qqq_info.clear()
+    _fetch_price_via_download.clear()
+    fetch_history.clear()
     st.session_state.force_refresh = False
 
 qqq_info  = fetch_qqq_info()
@@ -620,12 +595,13 @@ if fetch_issues:
     with c1:
         st.warning(f"⚠️ 以下数据获取失败：{issue_text}。请尝试手动刷新或开启 PE 手动输入。")
     with c2:
-        if st.button("🔄 重新获取数据", key="retry_fetch", use_container_width=True):
-            _fetch_qqq_info_cached.clear()
-            _fetch_current_price_cached.clear()
+        if st.button("🔄 重新获取数据", key="retry_fetch"):
+            fetch_qqq_info.clear()
+            _fetch_price_via_download.clear()
             st.rerun()
-
-# ═══════════════════════════════════════════════════════════════════════════════
+else:
+    # No issues — clean slate
+    pass
 # 模块 1 — 市场快照 + PE 仪表盘
 # ═══════════════════════════════════════════════════════════════════════════════
 section_title("📊", "市场快照")
