@@ -1,4 +1,5 @@
 import math
+import time
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -457,46 +458,106 @@ def build_gauge_svg(pe_val: float) -> str:
 
 
 # ─── Data Fetching (cached) ───────────────────────────────────────────────────
-@st.cache_data(ttl=600)
+# Strategy: cached inner functions raise on failure so Streamlit never
+# caches a None/error result.  Outer wrappers catch and return safe dicts.
+
+
+def _yf_retry(fn, max_tries=3, base_sleep=1.5):
+    """Call *fn* up to *max_tries* times with exponential backoff."""
+    for i in range(max_tries):
+        try:
+            return fn()
+        except Exception:
+            if i == max_tries - 1:
+                raise
+            time.sleep(base_sleep * (2 ** i))
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def _fetch_qqq_info_cached() -> dict:
+    """Cached inner — raises on failure so Streamlit won't cache the miss."""
+    for ticker in ("QQQM", "QQQ"):
+        def _try():
+            pe = yf.Ticker(ticker).info.get("trailingPE")
+            if pe is None:
+                raise ValueError(f"{ticker} trailingPE is None")
+            return {"pe": float(pe)}
+        pe_data = _yf_retry(_try, max_tries=2, base_sleep=1.5)
+        if pe_data["pe"] is not None:
+            return pe_data
+    raise RuntimeError("无法获取纳斯达克100 PE 数据 — 所有数据源均失败")
+
+
 def fetch_qqq_info() -> dict:
+    """Public wrapper — returns safe dict even on error (never caches failure)."""
     try:
-        info = yf.Ticker("QQQM").info
-        return {"pe": info.get("trailingPE")}
+        return _fetch_qqq_info_cached()
     except Exception:
         return {"pe": None}
 
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=300, show_spinner=False)
+def _fetch_current_price_cached(ticker: str) -> dict:
+    """Cached inner — raises on failure."""
+    # Try fast_info first (lightweight), fall back to info dict
+    for attempt in range(3):
+        try:
+            t = yf.Ticker(ticker)
+            fi = t.fast_info
+            p, pc = float(fi.last_price), float(fi.previous_close)
+            if p and pc:
+                return {"price": p, "prev_close": pc}
+        except Exception:
+            if attempt < 2:
+                time.sleep(1.5)
+    # Fallback: full info dict (more robust on some platforms)
+    for attempt in range(2):
+        try:
+            info = yf.Ticker(ticker).info
+            p = info.get("regularMarketPrice") or info.get("currentPrice")
+            pc = info.get("regularMarketPreviousClose") or info.get("previousClose")
+            if p and pc:
+                return {"price": float(p), "prev_close": float(pc)}
+        except Exception:
+            if attempt < 1:
+                time.sleep(1)
+    raise RuntimeError(f"无法获取 {ticker} 价格 — fast_info 和 info 均失败")
+
+
 def fetch_current_price(ticker: str) -> dict:
+    """Public wrapper — returns safe dict even on error."""
     try:
-        fi = yf.Ticker(ticker).fast_info
-        return {"price": fi.last_price, "prev_close": fi.previous_close}
+        return _fetch_current_price_cached(ticker)
     except Exception:
         return {"price": None, "prev_close": None}
 
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=300, show_spinner=False)
 def fetch_history(ticker: str, period: str) -> pd.DataFrame:
-    try:
+    def _try():
         df = yf.download(ticker, period=period, auto_adjust=True, progress=False)
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.droplevel(1)
         return df.dropna(subset=["Close"])
+    try:
+        return _yf_retry(_try, max_tries=2, base_sleep=1.0)
     except Exception:
         return pd.DataFrame()
 
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=300, show_spinner=False)
 def fetch_price_on_date(ticker: str, target_date: date) -> float | None:
-    try:
-        start = target_date - timedelta(days=7)
-        end   = target_date + timedelta(days=2)
+    start = target_date - timedelta(days=7)
+    end   = target_date + timedelta(days=2)
+    def _try():
         df = yf.download(ticker, start=start, end=end, auto_adjust=True, progress=False)
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.droplevel(1)
         if df.empty:
-            return None
+            raise ValueError("empty result")
         return float(df["Close"].iloc[-1])
+    try:
+        return _yf_retry(_try, max_tries=2, base_sleep=1.0)
     except Exception:
         return None
 
@@ -530,10 +591,39 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ─── Fetch data once ──────────────────────────────────────────────────────────
+if "force_refresh" not in st.session_state:
+    st.session_state.force_refresh = False
+
+# ── Manual refresh: clear caches so yfinance re-fetches ──
+if st.session_state.force_refresh:
+    _fetch_qqq_info_cached.clear()
+    _fetch_current_price_cached.clear()
+    st.session_state.force_refresh = False
+
 qqq_info  = fetch_qqq_info()
 qqqm_data = fetch_current_price("QQQM")
 voo_data  = fetch_current_price("VOO")
 auto_pe   = qqq_info["pe"]
+
+# ── Show data health status bar if anything failed ──
+fetch_issues = []
+if auto_pe is None:
+    fetch_issues.append("PE 数据")
+if qqqm_data["price"] is None:
+    fetch_issues.append("QQQM 价格")
+if voo_data["price"] is None:
+    fetch_issues.append("VOO 价格")
+
+if fetch_issues:
+    issue_text = "、".join(fetch_issues)
+    c1, c2 = st.columns([3, 1])
+    with c1:
+        st.warning(f"⚠️ 以下数据获取失败：{issue_text}。请尝试手动刷新或开启 PE 手动输入。")
+    with c2:
+        if st.button("🔄 重新获取数据", key="retry_fetch", use_container_width=True):
+            _fetch_qqq_info_cached.clear()
+            _fetch_current_price_cached.clear()
+            st.rerun()
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 模块 1 — 市场快照 + PE 仪表盘
@@ -542,7 +632,10 @@ section_title("📊", "市场快照")
 
 toggle_col, _ = st.columns([2.2, 5.8])
 with toggle_col:
-    use_manual = st.toggle("手动输入 PE（以 Gurufocus 为准）", value=False)
+    use_manual = st.toggle(
+        "手动输入 PE（以 Gurufocus 为准）",
+        value=(auto_pe is None),  # default on if auto-fetch failed
+    )
     if use_manual:
         current_pe = st.number_input(
             "纳斯达克100 TTM PE", min_value=0.0, max_value=300.0,
@@ -716,7 +809,7 @@ if current_pe:
     </p>
     """, unsafe_allow_html=True)
 else:
-    st.warning("无法自动获取 PE，请开启手动输入。")
+    st.warning("无法自动获取 PE — 已自动切换为手动模式，请在下方输入 Gurufocus PE 值。如仍需重试自动获取，点击上方 🔄 按钮。")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 模块 2 — QQQM 日 K 线图
