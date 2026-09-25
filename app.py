@@ -310,6 +310,18 @@ def get_pe_zone(pe: float) -> dict:
     return ZONES[5]
 
 
+ZONE_BOUNDARIES = (25.0, 28.0, 32.0, 35.0, 40.0)
+BOUNDARY_ALERT_DIST = 1.0      # warn when a non-Gurufocus PE is this close to a boundary
+GURUFOCUS_SOURCE = "Gurufocus (NDX)"
+GURUFOCUS_URL = "https://www.gurufocus.com/economic_indicators/6778/nasdaq-100-pe-ratio"
+
+
+def nearest_boundary(pe: float) -> tuple[float, float]:
+    """(boundary, distance) for the zone boundary closest to pe."""
+    b = min(ZONE_BOUNDARIES, key=lambda x: abs(pe - x))
+    return b, abs(pe - b)
+
+
 def fmt_reserve(zone: dict) -> str:
     if zone["reserve_change"] is None:
         return "全部清空"
@@ -497,7 +509,7 @@ def _sane_pe(val) -> float:
 def _pe_from_gurufocus() -> float:
     """Nasdaq-100 index PE — the same number the strategy is calibrated against.
     Page <title> reads like "Nasdaq 100 PE Ratio: 29.85 (Sep 2026) — ..."."""
-    html = _http_get("https://www.gurufocus.com/economic_indicators/6778/nasdaq-100-pe-ratio")
+    html = _http_get(GURUFOCUS_URL)
     m = re.search(r"PE Ratio:\s*([\d.]+)", html)
     if not m:
         raise ValueError("Gurufocus: PE not found in page")
@@ -524,7 +536,7 @@ def _pe_from_stockanalysis() -> float:
 
 
 PE_SOURCES = [
-    ("Gurufocus (NDX)", _pe_from_gurufocus),
+    (GURUFOCUS_SOURCE, _pe_from_gurufocus),
     ("Yahoo Finance (QQQM)", _pe_from_yahoo),
     ("StockAnalysis (QQQM)", _pe_from_stockanalysis),
 ]
@@ -714,6 +726,20 @@ with toggle_col:
         )
     else:
         current_pe = auto_pe
+
+# ── Boundary alert: unreliable PE (backup source or stale) sitting near a zone boundary ──
+if not use_manual and auto_pe is not None:
+    pe_unreliable = qqq_info["stale_since"] or qqq_info["source"] != GURUFOCUS_SOURCE
+    bnd, dist = nearest_boundary(float(auto_pe))
+    if pe_unreliable and dist < BOUNDARY_ALERT_DIST:
+        why = (f"上次成功值（{qqq_info['source']} · {qqq_info['stale_since']}），可能已过时"
+               if qqq_info["stale_since"] else f"备用源（{qqq_info['source']}）")
+        st.warning(
+            f"**⚠️ 建议去 Gurufocus 核对一下**\n\n"
+            f"当前 PE **{auto_pe:.2f}** 来自{why}，离区间分界线 **{bnd:g}** 只差 **{dist:.2f}**。"
+            f"备用源与 Gurufocus 通常相差 1–2 点，可能导致区间判断出错。\n\n"
+            f"👉 [打开 Gurufocus 查看最新值]({GURUFOCUS_URL})，然后打开上方「手动输入 PE」开关，填入 Gurufocus 的数值。"
+        )
 
 left_col, right_col = st.columns([1, 2.3])
 
