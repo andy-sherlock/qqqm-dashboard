@@ -20,7 +20,8 @@ streamlit run app.py
 ## 数据更新
 
 - 每次打开页面自动从 Yahoo Finance 拉取最新数据
-- 价格缓存 5 分钟，ticker.info 缓存 10 分钟
+- 价格缓存 5 分钟，PE 缓存 1 小时
+- PE 依次尝试 Gurufocus → Yahoo Finance → StockAnalysis；全部失败时显示上次成功获取的值（存于 `.pe_cache.json`）
 - 无需额外定时任务
 
 ## 定投记录持久化

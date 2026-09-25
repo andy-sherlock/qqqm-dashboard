@@ -1,12 +1,20 @@
+import json
 import math
+import re
 import time
+from pathlib import Path
 import streamlit as st
+import requests
 import yfinance as yf
+try:
+    from curl_cffi import requests as curl_requests
+except ImportError:
+    curl_requests = None
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 st.set_page_config(
     page_title="Andy's FIRE Tracker",
@@ -460,22 +468,108 @@ def build_gauge_svg(pe_val: float) -> str:
 # ─── Data Fetching (cached) ───────────────────────────────────────────────────
 # Key insight: Yahoo Finance v10 API (info/fast_info) is aggressively rate-limited
 # on shared cloud IPs.  The v8 chart API (download/history) has looser limits.
-# Strategy: use v8 for prices, v10 for PE with long cache + gentle retry.
+# Strategy: use v8 for prices; for PE try several independent sources in turn,
+# and fall back to the last successfully fetched value saved on disk.
+
+PE_CACHE_FILE = Path(__file__).with_name(".pe_cache.json")
+PE_SANE_RANGE = (5.0, 100.0)   # anything outside is a parse error, not a real PE
+_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+       "(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36")
+
+
+def _http_get(url: str) -> str:
+    """GET with a browser TLS fingerprint when curl_cffi is available."""
+    if curl_requests is not None:
+        r = curl_requests.get(url, impersonate="chrome", timeout=10)
+    else:
+        r = requests.get(url, headers={"User-Agent": _UA}, timeout=10)
+    r.raise_for_status()
+    return r.text
+
+
+def _sane_pe(val) -> float:
+    pe = float(val)
+    if not PE_SANE_RANGE[0] <= pe <= PE_SANE_RANGE[1]:
+        raise ValueError(f"PE {pe} outside sane range")
+    return pe
+
+
+def _pe_from_gurufocus() -> float:
+    """Nasdaq-100 index PE — the same number the strategy is calibrated against.
+    Page <title> reads like "Nasdaq 100 PE Ratio: 29.85 (Sep 2026) — ..."."""
+    html = _http_get("https://www.gurufocus.com/economic_indicators/6778/nasdaq-100-pe-ratio")
+    m = re.search(r"PE Ratio:\s*([\d.]+)", html)
+    if not m:
+        raise ValueError("Gurufocus: PE not found in page")
+    return _sane_pe(m.group(1))
+
+
+def _pe_from_yahoo() -> float:
+    for ticker in ("QQQM", "QQQ"):
+        try:
+            pe = yf.Ticker(ticker).info.get("trailingPE")
+            if pe is not None:
+                return _sane_pe(pe)
+        except Exception:
+            time.sleep(1.0)
+    raise ValueError("Yahoo: no trailingPE for QQQM/QQQ")
+
+
+def _pe_from_stockanalysis() -> float:
+    html = _http_get("https://stockanalysis.com/etf/qqqm/")
+    m = re.search(r"PE Ratio.{0,300}?(\d{1,3}\.\d{1,2})", html, re.S)
+    if not m:
+        raise ValueError("StockAnalysis: PE not found in page")
+    return _sane_pe(m.group(1))
+
+
+PE_SOURCES = [
+    ("Gurufocus (NDX)", _pe_from_gurufocus),
+    ("Yahoo Finance (QQQM)", _pe_from_yahoo),
+    ("StockAnalysis (QQQM)", _pe_from_stockanalysis),
+]
+
+
+def _load_pe_cache() -> dict | None:
+    try:
+        return json.loads(PE_CACHE_FILE.read_text())
+    except Exception:
+        return None
+
+
+def _save_pe_cache(pe: float, source: str) -> None:
+    try:
+        PE_CACHE_FILE.write_text(json.dumps(
+            {"pe": pe, "source": source, "ts": datetime.now().isoformat(timespec="minutes")}))
+    except Exception:
+        pass
 
 
 @st.cache_data(ttl=3600, show_spinner=False)               # PE changes slowly — 1 h cache
+def _fetch_pe_live() -> dict:
+    """Try each source in order.  Raises when all fail so Streamlit never caches a failure."""
+    errors = []
+    for name, fn in PE_SOURCES:
+        try:
+            pe = fn()
+            _save_pe_cache(pe, name)
+            return {"pe": pe, "source": name, "stale_since": None}
+        except Exception as e:
+            errors.append(f"{name}: {e}")
+    raise RuntimeError("; ".join(errors))
+
+
 def fetch_qqq_info() -> dict:
-    """Fetch Nasdaq-100 trailing PE.  Long cache, gentle retry."""
-    for ticker in ("QQQM", "QQQ"):
-        for attempt in range(3):
-            try:
-                pe = yf.Ticker(ticker).info.get("trailingPE")
-                if pe is not None:
-                    return {"pe": float(pe)}
-            except Exception:
-                pass
-            time.sleep(3.0)                                 # generous backoff
-    return {"pe": None}
+    """Nasdaq-100 trailing PE: live sources first, last-known-good value second."""
+    try:
+        return _fetch_pe_live()
+    except Exception:
+        pass
+    cached = _load_pe_cache()
+    if cached and cached.get("pe"):
+        return {"pe": float(cached["pe"]), "source": cached.get("source", "?"),
+                "stale_since": cached.get("ts")}
+    return {"pe": None, "source": None, "stale_since": None}
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -570,7 +664,7 @@ if "force_refresh" not in st.session_state:
 
 # ── Manual refresh: clear all data caches ──
 if st.session_state.force_refresh:
-    fetch_qqq_info.clear()
+    _fetch_pe_live.clear()
     _fetch_price_via_download.clear()
     fetch_history.clear()
     st.session_state.force_refresh = False
@@ -596,7 +690,7 @@ if fetch_issues:
         st.warning(f"⚠️ 以下数据获取失败：{issue_text}。请尝试手动刷新或开启 PE 手动输入。")
     with c2:
         if st.button("🔄 重新获取数据", key="retry_fetch"):
-            fetch_qqq_info.clear()
+            _fetch_pe_live.clear()
             _fetch_price_via_download.clear()
             st.rerun()
 else:
@@ -627,8 +721,13 @@ with left_col:
     st.metric(
         "纳斯达克100 TTM PE",
         f"{current_pe:.2f}" if current_pe else "—",
-        help="来自 QQQ trailingPE，可手动覆盖以 Gurufocus 数据为准",
+        help="自动依次尝试 Gurufocus → Yahoo → StockAnalysis，可手动覆盖以 Gurufocus 数据为准",
     )
+    if not use_manual and auto_pe is not None:
+        if qqq_info["stale_since"]:
+            st.caption(f"⚠️ 实时源暂不可用，显示上次成功值（{qqq_info['source']} · {qqq_info['stale_since']}）")
+        else:
+            st.caption(f"来源：{qqq_info['source']}")
     if qqqm_data["price"] and qqqm_data["prev_close"]:
         chg = (qqqm_data["price"] - qqqm_data["prev_close"]) / qqqm_data["prev_close"] * 100
         st.metric("QQQM 实时价", f"${qqqm_data['price']:.2f}", f"{chg:+.2f}%")
